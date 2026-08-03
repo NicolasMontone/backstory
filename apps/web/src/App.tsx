@@ -244,7 +244,16 @@ export function App() {
               : grouped.map((s) => (
                   <SessionRow key={s.id} s={s} active={s.id === selectedId} onClick={() => setSelectedId(s.id)} />
                 ))}
-            {searching && hits!.length === 0 && <div className="empty">no matches</div>}
+            {searching && hits!.length === 0 && (
+              <div className="search-empty">
+                <div className="search-empty-icon">⌕</div>
+                <div className="search-empty-title">No prompts found</div>
+                <div className="search-empty-detail">
+                  Nothing matched <span>“{query.trim()}”</span>
+                </div>
+                <button className="clear-search" onClick={() => setQuery("")}>Clear search</button>
+              </div>
+            )}
           </div>
         </aside>
         <section className="detail">
