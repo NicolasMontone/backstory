@@ -1,5 +1,5 @@
 import { describe, expect, test, afterAll } from "bun:test";
-import { isInjectedContext, parseCodexFile } from "../src/providers/codex.ts";
+import { cleanCodexPrompt, isInjectedContext, parseCodexFile } from "../src/providers/codex.ts";
 import { jsonl, rm, tmp, write } from "./helpers.ts";
 import { join } from "node:path";
 
@@ -10,6 +10,33 @@ describe("isInjectedContext", () => {
     expect(isInjectedContext("# Codex desktop context")).toBe(true);
     expect(isInjectedContext("fix the login bug")).toBe(false);
     expect(isInjectedContext("  can you refactor this?")).toBe(false);
+  });
+});
+
+describe("cleanCodexPrompt", () => {
+  test("keeps file references and request, removes desktop transport wrappers", () => {
+    const cleaned = cleanCodexPrompt(`
+# Files mentioned by the user:
+
+## CleanShot.png: /Users/me/Library/Application Support/CleanShot/CleanShot.png
+
+<in-app-browser-context source="ambient-ui-state">
+# In app browser:
+- Current URL: http://localhost:4319/
+</in-app-browser-context>
+
+## My request for Codex:
+they should be related to the prompts if we can rather separated
+
+<image name=[Image #1] path="/Users/me/CleanShot.png">
+</image>
+`);
+
+    expect(cleaned).toBe(
+      "Files mentioned:\n- /Users/me/Library/Application Support/CleanShot/CleanShot.png\n\nthey should be related to the prompts if we can rather separated",
+    );
+    expect(cleaned).not.toContain("in-app-browser-context");
+    expect(cleaned).not.toContain("<image");
   });
 });
 

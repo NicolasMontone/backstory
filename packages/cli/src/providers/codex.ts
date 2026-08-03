@@ -26,6 +26,33 @@ export function isInjectedContext(text: string): boolean {
   return false;
 }
 
+/**
+ * Normalize Codex desktop's transport wrapper around a real user turn.
+ *
+ * The desktop client may prepend file headings, ambient browser state, and an
+ * image tag around the actual request. Those are useful as provenance, but the
+ * browser state and image transport markup should not become prompt content.
+ */
+export function cleanCodexPrompt(text: string): string {
+  const files = [...text.matchAll(/^## [^\n]+?: (\/[^\n]+)$/gm)].map((m) => m[1].trim());
+  let cleaned = text
+    .replace(/<in-app-browser-context\b[^>]*>[\s\S]*?<\/in-app-browser-context>/gi, "")
+    .replace(/<image\b[^>]*>[\s\S]*?<\/image>/gi, "")
+    .replace(/<image\b[^>]*>/gi, "")
+    .replace(/<\/image>/gi, "")
+    .replace(/^# Files mentioned by the user:\s*$/gim, "")
+    .replace(/^## My request for Codex:\s*$/gim, "")
+    .replace(/^## [^\n]+?: \/[^\n]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (files.length > 0) {
+    const fileBlock = ["Files mentioned:", ...files.map((file) => `- ${file}`)].join("\n");
+    cleaned = cleaned ? `${fileBlock}\n\n${cleaned}` : fileBlock;
+  }
+  return cleaned;
+}
+
 /** Load session_index.jsonl into id -> {title, updatedAt}. Best-effort. */
 async function loadIndex(): Promise<CodexIndex> {
   const map: CodexIndex = new Map();
@@ -97,7 +124,7 @@ async function parseCodexRollout(path: string, index: CodexIndex): Promise<Parse
       for (const c of content) {
         if (typeof c?.text === "string") parts.push(c.text);
       }
-      const joined = parts.join("\n").trim();
+      const joined = cleanCodexPrompt(parts.join("\n"));
       if (joined && !isInjectedContext(joined)) {
         prompts.push({ sessionId: meta?.id ?? path, seq: seq++, text: joined, ts });
       }
