@@ -129,12 +129,13 @@ body {
   min-height: 0;
 }
 .searchbar {
+  position: relative;
   padding: 12px;
   border-bottom: 1px solid var(--border);
 }
 .searchbar input {
   width: 100%;
-  padding: 8px 10px;
+  padding: 8px 38px 8px 10px;
   font-family: var(--mono);
   font-size: 13px;
   color: var(--fg);
@@ -146,6 +147,49 @@ body {
 .searchbar input:focus {
   border-color: var(--accent);
 }
+.sort-control { position: absolute; top: 17px; right: 17px; }
+.sort-trigger {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font: 16px/1 var(--mono);
+}
+.sort-trigger:hover,
+.sort-trigger.active { border-color: var(--border-strong); background: var(--panel-2); color: var(--fg); }
+.sort-menu {
+  position: absolute;
+  z-index: 4;
+  top: 29px;
+  right: 0;
+  width: 148px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--panel-2);
+  box-shadow: 0 8px 24px #00000040;
+}
+.sort-menu button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: 10px var(--mono);
+  text-align: left;
+}
+.sort-menu button:hover,
+.sort-menu button.selected { background: var(--panel); color: var(--fg); }
+.sort-menu button.selected span:last-child { color: var(--accent); }
 
 .list {
   overflow-y: auto;

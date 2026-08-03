@@ -291,6 +291,7 @@ function ActivityChart({ points, providers }: { points: ActivityPoint[]; provide
 }
 
 type View = "prompts" | "observability";
+type SessionSort = "last-message" | "prompts" | "alphabetical";
 
 function Observability({ points }: { points: ActivityPoint[] }) {
   const totalPrompts = points.reduce((n, p) => n + p.prompts, 0);
@@ -329,6 +330,8 @@ export function App() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [query, setQuery] = useState("");
+  const [sessionSort, setSessionSort] = useState<SessionSort>("last-message");
+  const [sortOpen, setSortOpen] = useState(false);
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionWithPrompts | null>(null);
@@ -372,7 +375,14 @@ export function App() {
   }, [selectedId]);
 
   const searching = hits !== null;
-  const grouped = useMemo(() => sessions, [sessions]);
+  const grouped = useMemo(() => {
+    const lastMessage = (session: SessionListItem) => session.endedAt ?? session.startedAt ?? "";
+    return [...sessions].sort((a, b) => {
+      if (sessionSort === "prompts") return b.promptCount - a.promptCount || lastMessage(b).localeCompare(lastMessage(a));
+      if (sessionSort === "alphabetical") return (a.title || a.id).localeCompare(b.title || b.id) || lastMessage(b).localeCompare(lastMessage(a));
+      return lastMessage(b).localeCompare(lastMessage(a));
+    });
+  }, [sessions, sessionSort]);
 
   return (
     <div className="app">
@@ -386,6 +396,34 @@ export function App() {
               onChange={(e) => setQuery(e.target.value)}
               spellCheck={false}
             />
+            <div className="sort-control">
+              <button
+                className={`sort-trigger ${sortOpen ? "active" : ""}`}
+                aria-label="Sort sessions"
+                aria-expanded={sortOpen}
+                onClick={() => setSortOpen((open) => !open)}
+              >
+                ↕
+              </button>
+              {sortOpen && <div className="sort-menu" role="menu" aria-label="Sort sessions by">
+                {([
+                  ["last-message", "Last message"],
+                  ["prompts", "Most prompts"],
+                  ["alphabetical", "Alphabetical"],
+                ] as Array<[SessionSort, string]>).map(([value, label]) => (
+                  <button
+                    key={value}
+                    role="menuitemradio"
+                    aria-checked={sessionSort === value}
+                    className={sessionSort === value ? "selected" : ""}
+                    onClick={() => { setSessionSort(value); setSortOpen(false); }}
+                  >
+                    <span>{label}</span>
+                    {sessionSort === value && <span aria-hidden="true">✓</span>}
+                  </button>
+                ))}
+              </div>}
+            </div>
           </div>
           <div className="list">
             {searching

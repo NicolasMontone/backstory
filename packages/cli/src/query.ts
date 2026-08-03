@@ -124,6 +124,7 @@ export interface SessionListItem {
   repo: string | null;
   branch: string | null;
   startedAt: string;
+  endedAt: string;
   promptCount: number;
 }
 
@@ -134,6 +135,7 @@ export function listSessions(db: Database, opts: { limit?: number; repo?: string
   return db
     .query(
       `SELECT s.id, s.provider, s.title, s.repo, s.branch, s.started_at AS startedAt,
+              s.ended_at AS endedAt,
               (SELECT COUNT(*) FROM prompts p WHERE p.session_id = s.id) AS promptCount
        FROM sessions s ${where}
        ORDER BY s.ended_at DESC LIMIT ?`,
