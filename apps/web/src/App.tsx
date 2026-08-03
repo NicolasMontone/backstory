@@ -92,11 +92,11 @@ function SessionRow({
       <div className="title">{s.title || s.id}</div>
       <div className="meta">
         <Badge kind={s.provider}>{s.provider}</Badge>
-        <span>{s.repo ?? "no-repo"}</span>
+        <span className="repo">{s.repo ?? "no-repo"}</span>
         {s.branch && <span className="sep">·</span>}
-        {s.branch && <span>{s.branch}</span>}
+        {s.branch && <span className="branch">{s.branch}</span>}
         <span className="sep">·</span>
-        <span>{s.promptCount}p</span>
+        <span className="count">{s.promptCount}p</span>
       </div>
     </div>
   );

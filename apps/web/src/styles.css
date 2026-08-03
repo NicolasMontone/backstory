@@ -199,10 +199,10 @@ body {
 .row .meta {
   margin-top: 4px;
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   min-width: 0;
+  overflow: hidden;
   line-height: 1.35;
   font-family: var(--mono);
   font-size: 11px;
@@ -210,7 +210,24 @@ body {
 }
 .row .meta > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row .meta .repo,
+.row .meta .branch {
+  flex: 0 1 auto;
+}
+.row .meta .badge {
+  flex: 0 0 auto;
+}
+.row .meta .branch {
+  min-width: 2ch;
+}
+.row .meta .sep,
+.row .meta .count {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .badge {
