@@ -75,6 +75,27 @@ export function sessionsForCommit(db: Database, sha: string): SessionWithPrompts
   return hydrate(db, rows);
 }
 
+export interface LinkedCommit {
+  sha: string;
+  repo: string | null;
+  subject: string | null;
+  author: string | null;
+  authoredAt: string | null;
+  source: string; // hook | correlated
+}
+
+/** Commits linked to a session (the reverse of sessionsForCommit). */
+export function commitsForSession(db: Database, sessionId: string): LinkedCommit[] {
+  return db
+    .query(
+      `SELECT c.sha, c.repo, c.subject, c.author, c.authored_at AS authoredAt, cs.source
+       FROM commit_sessions cs JOIN commits c ON c.sha = cs.sha
+       WHERE cs.session_id = ?
+       ORDER BY c.authored_at DESC`,
+    )
+    .all(sessionId) as LinkedCommit[];
+}
+
 export function sessionsForBranch(db: Database, branch: string, repo?: string): SessionWithPrompts[] {
   const rows = (
     repo

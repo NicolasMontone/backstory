@@ -35,6 +35,7 @@ async function handleApi(bs: Backstory, url: URL): Promise<Response> {
     if (p === "sessions")
       return json(bs.sessions({ limit: q.get("limit") ? Number(q.get("limit")) : 200, repo: q.get("repo") ?? undefined }));
     if (seg[0] === "session" && seg[1]) {
+      if (seg[2] === "commits") return json(bs.sessionCommits(seg[1]));
       const s = bs.session(seg[1]);
       return s ? json(s) : json({ error: "not found" }, 404);
     }

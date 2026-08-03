@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type SearchHit, type SessionListItem, type SessionWithPrompts, type Stats } from "./api.ts";
+import { api, type LinkedCommit, type PrReport, type SearchHit, type SessionListItem, type SessionWithPrompts, type Stats } from "./api.ts";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "?";
@@ -11,6 +11,45 @@ function fmtDate(iso: string | null): string {
 
 function Badge({ kind, children }: { kind: string; children: React.ReactNode }) {
   return <span className={`badge ${kind}`}>{children}</span>;
+}
+
+function Markdown({ text }: { text: string }) {
+  return (
+    <div className="markdown">
+      {text.split("\n").map((line, i) => (
+        <span key={i}>
+          {i > 0 && <br />}
+          {renderInlineMarkdown(line)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const pattern = /(!?)\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\bhttps?:\/\/[^\s<]+|`[^`]+`|\*\*[^*]+\*\*|__[^_]+__/g;
+  let last = 0;
+  for (const match of text.matchAll(pattern)) {
+    const value = match[0];
+    const start = match.index ?? 0;
+    if (start > last) nodes.push(text.slice(last, start));
+    if (match[1] === "!") {
+      nodes.push(value);
+    } else if (match[2] && match[3]) {
+      nodes.push(<a key={`${start}-link`} href={match[3]} target="_blank" rel="noreferrer">{match[2]}</a>);
+    } else if (value.startsWith("http")) {
+      const href = value.replace(/[.,;:!?]+$/, "");
+      nodes.push(<a key={`${start}-url`} href={href} target="_blank" rel="noreferrer">{value}</a>);
+    } else if (value.startsWith("`")) {
+      nodes.push(<code key={`${start}-code`}>{value.slice(1, -1)}</code>);
+    } else {
+      nodes.push(<strong key={`${start}-strong`}>{value.slice(2, -2)}</strong>);
+    }
+    last = start + value.length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
 }
 
 function Header({ stats }: { stats: Stats | null }) {
@@ -63,7 +102,29 @@ function SessionRow({
   );
 }
 
-function Detail({ session }: { session: SessionWithPrompts | null }) {
+function CommitList({ commits }: { commits: LinkedCommit[] }) {
+  if (commits.length === 0) return null;
+  return (
+    <section className="commits">
+      <div className="label">linked commits</div>
+      {commits.map((commit) => (
+        <a
+          className="commit"
+          key={commit.sha}
+          href={commit.repo ? `https://github.com/${commit.repo}/commit/${commit.sha}` : undefined}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className="commit-sha">{commit.sha.slice(0, 10)}</span>
+          <span className="commit-subject">{commit.subject || "(no subject)"}</span>
+          <Badge kind={commit.source === "hook" ? "exact" : "corr"}>{commit.source === "hook" ? "exact" : "correlated"}</Badge>
+        </a>
+      ))}
+    </section>
+  );
+}
+
+function Detail({ session, commits }: { session: SessionWithPrompts | null; commits: LinkedCommit[] }) {
   if (!session) return <div className="empty">Select a session to see its prompts →</div>;
   return (
     <div>
@@ -81,9 +142,10 @@ function Detail({ session }: { session: SessionWithPrompts | null }) {
       {session.prompts.map((p) => (
         <div className="prompt" key={p.seq}>
           <div className="num">#{p.seq}{p.ts ? ` · ${fmtDate(p.ts)}` : ""}</div>
-          <div className="text">{p.text}</div>
+          <Markdown text={p.text} />
         </div>
       ))}
+      <CommitList commits={commits} />
     </div>
   );
 }
@@ -95,6 +157,10 @@ export function App() {
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionWithPrompts | null>(null);
+  const [commits, setCommits] = useState<LinkedCommit[]>([]);
+  const [prNumber, setPrNumber] = useState("");
+  const [pr, setPr] = useState<PrReport | null>(null);
+  const [prError, setPrError] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -116,13 +182,32 @@ export function App() {
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
+      setCommits([]);
       return;
     }
-    api.session(selectedId).then(setDetail).catch(() => setDetail(null));
+    setDetail(null);
+    setCommits([]);
+    Promise.all([api.session(selectedId), api.sessionCommits(selectedId)])
+      .then(([session, linkedCommits]) => {
+        setDetail(session);
+        setCommits(linkedCommits);
+      })
+      .catch(() => setDetail(null));
   }, [selectedId]);
 
   const searching = hits !== null;
   const grouped = useMemo(() => sessions, [sessions]);
+
+  function loadPr(e: React.FormEvent) {
+    e.preventDefault();
+    const number = Number(prNumber);
+    if (!Number.isInteger(number) || number < 1) return;
+    setPrError(null);
+    api.pr(number).then(setPr).catch((error: Error) => {
+      setPr(null);
+      setPrError(error.message);
+    });
+  }
 
   return (
     <div className="app">
@@ -136,7 +221,31 @@ export function App() {
               onChange={(e) => setQuery(e.target.value)}
               spellCheck={false}
             />
+            <form className="pr-search" onSubmit={loadPr}>
+              <input
+                placeholder="load PR #…"
+                value={prNumber}
+                onChange={(e) => setPrNumber(e.target.value)}
+                inputMode="numeric"
+                spellCheck={false}
+              />
+              <button type="submit">open</button>
+            </form>
           </div>
+          {pr && (
+            <div className="pr-result">
+              <a href={pr.pr.url} target="_blank" rel="noreferrer" className="pr-title">
+                PR #{pr.pr.number} · {pr.pr.title}
+              </a>
+              <div className="pr-meta">{pr.pr.repo} · {pr.sessions.length} linked sessions</div>
+              {pr.sessions.map((s) => (
+                <button className="pr-session" key={s.id} onClick={() => setSelectedId(s.id)}>
+                  {s.title || s.id}
+                </button>
+              ))}
+            </div>
+          )}
+          {prError && <div className="pr-error">{prError}</div>}
           <div className="list">
             {searching
               ? hits!.map((h) => (
@@ -162,7 +271,7 @@ export function App() {
           </div>
         </aside>
         <section className="detail">
-          <Detail session={detail} />
+          <Detail session={detail} commits={commits} />
         </section>
       </div>
     </div>

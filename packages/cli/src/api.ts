@@ -7,6 +7,7 @@ import { hookProviders, recordHook, type HookInstallResult, type HookProvider, t
 import {
   activeSession,
   commitInfo,
+  commitsForSession,
   listSessions,
   searchPrompts,
   sessionById,
@@ -15,6 +16,7 @@ import {
   sessionsForShas,
   stats,
   type CommitInfo,
+  type LinkedCommit,
   type SearchHit,
   type SessionListItem,
   type SessionWithPrompts,
@@ -135,6 +137,11 @@ export class Backstory {
     return sessionById(this.db, id);
   }
 
+  /** Commits linked to a session (reverse of commitReport). */
+  sessionCommits(id: string): LinkedCommit[] {
+    return commitsForSession(this.db, id);
+  }
+
   search(term: string, limit?: number): SearchHit[] {
     return searchPrompts(this.db, term, limit);
   }
@@ -174,6 +181,7 @@ export type {
   SearchHit,
   SessionListItem,
   SessionWithPrompts,
+  LinkedCommit,
   Stats,
   HookProvider,
   HookStatus,

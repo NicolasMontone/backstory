@@ -1,5 +1,7 @@
 import type {
   CommitReport,
+  LinkedCommit,
+  PrReport,
   SearchHit,
   SessionListItem,
   SessionWithPrompts,
@@ -20,8 +22,10 @@ export const api = {
   sessions: (repo?: string) =>
     j<SessionListItem[]>(`/api/sessions${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
   session: (id: string) => j<SessionWithPrompts>(`/api/session/${encodeURIComponent(id)}`),
+  sessionCommits: (id: string) => j<LinkedCommit[]>(`/api/session/${encodeURIComponent(id)}/commits`),
   search: (q: string) => j<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
   commit: (sha: string) => j<CommitReport>(`/api/commit/${encodeURIComponent(sha)}`),
+  pr: (number: number) => j<PrReport>(`/api/pr/${number}`),
 };
 
-export type { CommitReport, SearchHit, SessionListItem, SessionWithPrompts, Stats };
+export type { CommitReport, LinkedCommit, PrReport, SearchHit, SessionListItem, SessionWithPrompts, Stats };

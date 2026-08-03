@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { openDb, linkCommitSession, replacePrompts, upsertCommit, upsertSessions } from "../src/db.ts";
 import {
   activeSession,
+  commitsForSession,
   searchPrompts,
   sessionById,
   sessionsForBranch,
@@ -65,6 +66,14 @@ describe("query", () => {
     const db = seed();
     expect(sessionById(db, "s1")?.prompts.length).toBe(2);
     expect(sessionById(db, "nope")).toBeNull();
+  });
+
+  test("commitsForSession returns linked commit metadata", () => {
+    const db = seed();
+    expect(commitsForSession(db, "s1")).toEqual([
+      { sha: "c1", repo: "acme/app", subject: "widget", author: "Me", authoredAt: "2026-01-01T00:30:00Z", source: "correlated" },
+    ]);
+    expect(commitsForSession(db, "nope")).toEqual([]);
   });
 
   test("searchPrompts matches FTS terms", () => {
