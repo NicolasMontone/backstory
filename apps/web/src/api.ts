@@ -25,10 +25,6 @@ export const api = {
     j<SessionListItem[]>(`/api/sessions${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
   session: (id: string) => j<SessionWithPrompts>(`/api/session/${encodeURIComponent(id)}`),
   sessionCommits: (id: string) => j<LinkedCommit[]>(`/api/session/${encodeURIComponent(id)}/commits`),
-  openSession: (id: string) => fetch(`/api/session/${encodeURIComponent(id)}/open`, { method: "POST" }).then(async (r) => {
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? r.statusText);
-    return r.json() as Promise<{ provider: string; command: string }>;
-  }),
   search: (q: string) => j<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
   commit: (sha: string) => j<CommitReport>(`/api/commit/${encodeURIComponent(sha)}`),
   pr: (number: number) => j<PrReport>(`/api/pr/${number}`),

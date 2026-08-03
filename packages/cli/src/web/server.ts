@@ -25,33 +25,7 @@ const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 
 /** Route /api/* to the typed Backstory facade. */
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function openSessionTerminal(bs: Backstory, id: string): { provider: string; command: string } {
-  const session = bs.session(id);
-  if (!session) throw new Error("session not found");
-  if (process.platform !== "darwin") throw new Error("Opening sessions is currently supported on macOS only");
-  if (session.provider === "codex") {
-    const url = `codex://threads/${encodeURIComponent(session.id)}`;
-    const result = Bun.spawnSync(["open", url], { stdout: "ignore", stderr: "pipe" });
-    if (result.exitCode !== 0) throw new Error(`Codex Desktop could not open the thread (${result.exitCode})`);
-    return { provider: session.provider, command: `open ${url}` };
-  }
-  const binaryName = "claude";
-  const binary = Bun.which(binaryName);
-  if (!binary) throw new Error(`${binaryName} is not available on the Backstory server PATH`);
-  const command = session.provider === "codex"
-    ? `${shellQuote(binary)} resume ${shellQuote(session.id)}`
-    : `${shellQuote(binary)} --resume ${shellQuote(session.id)}`;
-  const script = `tell application "Terminal" to do script "cd ${shellQuote(session.cwd)} && ${command}"`;
-  const result = Bun.spawnSync(["osascript", "-e", script], { stdout: "ignore", stderr: "pipe" });
-  if (result.exitCode !== 0) throw new Error(`macOS could not open Terminal (${result.exitCode})`);
-  return { provider: session.provider, command };
-}
-
-async function handleApi(bs: Backstory, url: URL, req: Request): Promise<Response> {
+async function handleApi(bs: Backstory, url: URL): Promise<Response> {
   const p = url.pathname.replace(/^\/api\//, "");
   const seg = p.split("/").map(decodeURIComponent);
   const q = url.searchParams;
@@ -62,7 +36,6 @@ async function handleApi(bs: Backstory, url: URL, req: Request): Promise<Respons
     if (p === "sessions")
       return json(bs.sessions({ limit: q.get("limit") ? Number(q.get("limit")) : 200, repo: q.get("repo") ?? undefined }));
     if (seg[0] === "session" && seg[1]) {
-      if (seg[2] === "open" && req.method === "POST") return json(openSessionTerminal(bs, seg[1]));
       if (seg[2] === "commits") return json(bs.sessionCommits(seg[1]));
       const s = bs.session(seg[1]);
       return s ? json(s) : json({ error: "not found" }, 404);
@@ -110,7 +83,7 @@ export function startWebServer(opts: { port?: number; open?: boolean } = {}): { 
     port,
     async fetch(req) {
       const url = new URL(req.url);
-      if (url.pathname.startsWith("/api/")) return handleApi(bs, url, req);
+      if (url.pathname.startsWith("/api/")) return handleApi(bs, url);
       if (!dist) {
         return new Response(
           "<h1>backstory web</h1><p>UI not built yet. Run:</p><pre>pnpm --filter @backstory/web build</pre><p>The API is live at <code>/api/stats</code>.</p>",

@@ -218,28 +218,12 @@ function commitsForPrompt(prompts: SessionWithPrompts["prompts"], index: number,
 }
 
 function Detail({ session, commits }: { session: SessionWithPrompts | null; commits: LinkedCommit[] }) {
-  const [openError, setOpenError] = useState<string | null>(null);
-  const [openStatus, setOpenStatus] = useState<string | null>(null);
   if (!session) return <div className="empty">Select a session to see its prompts →</div>;
-  const selectedSession = session;
-  async function openSession() {
-    setOpenError(null);
-    setOpenStatus(null);
-    try {
-      const result = await api.openSession(selectedSession.id);
-      setOpenStatus(`Opened in ${result.provider === "codex" ? "Codex" : "Claude Code"}`);
-    } catch (error) {
-      setOpenError(error instanceof Error ? error.message : "Could not open session");
-    }
-  }
   return (
     <div>
       <div className="detail-heading">
         <h1>{session.title || session.id}</h1>
-        <button className="open-session" onClick={openSession}>Open in {session.provider === "codex" ? "Codex" : "Claude Code"}</button>
       </div>
-      {openError && <div className="open-error">{openError}</div>}
-      {openStatus && <div className="open-status">{openStatus}</div>}
       <div className="subline">
         <Badge kind={session.provider}>{session.provider}</Badge>
         {session.source && <Badge kind={session.source === "hook" ? "exact" : "corr"}>{session.source === "hook" ? "exact" : "correlated"}</Badge>}

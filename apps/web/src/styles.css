@@ -328,27 +328,6 @@ body {
   gap: 16px;
 }
 .detail-heading h1 { min-width: 0; }
-.open-session {
-  flex: 0 0 auto;
-  padding: 6px 9px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--muted);
-  cursor: pointer;
-  font: 10px var(--mono);
-}
-.open-session:hover { border-color: var(--accent); color: var(--accent); }
-.open-error {
-  margin: -2px 0 10px;
-  color: var(--claude);
-  font: 11px var(--mono);
-}
-.open-status {
-  margin: -2px 0 10px;
-  color: var(--exact);
-  font: 11px var(--mono);
-}
 .detail .subline {
   font-family: var(--mono);
   font-size: 12px;
