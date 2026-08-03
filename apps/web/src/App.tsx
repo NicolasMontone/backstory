@@ -153,12 +153,6 @@ function Header({ stats, view, onViewChange }: { stats: Stats | null; view: View
           <span>
             <b>{stats.prompts}</b> prompts
           </span>
-          <span className="exact">
-            <b>{stats.linksExact}</b> exact
-          </span>
-          <span className="corr">
-            <b>{stats.linksCorrelated}</b> correlated
-          </span>
         </div>
       )}
     </header>
