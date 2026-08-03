@@ -220,7 +220,8 @@ body {
 }
 .row .meta {
   margin-top: 4px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 54px 105px minmax(0, 1fr) 68px;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -254,16 +255,18 @@ body {
   text-overflow: ellipsis;
 }
 .row .meta .repo {
-  flex: 0 1 105px;
+  min-width: 0;
 }
 .row .meta .badge {
-  flex: 0 0 auto;
+  width: 54px;
+  justify-self: start;
 }
 .row .meta .branch {
-  flex: 1 1 auto;
+  min-width: 0;
 }
 .row .meta .count {
-  flex: 0 0 auto;
+  width: 68px;
+  justify-content: flex-end;
   padding-left: 8px;
   border-left: 1px solid var(--border-strong);
   color: var(--accent);

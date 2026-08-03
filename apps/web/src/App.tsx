@@ -180,7 +180,7 @@ function SessionRow({
       <div className="meta">
         <Badge kind={s.provider}>{s.provider}</Badge>
         <span className="field repo"><span className="field-label">repo</span><span className="field-value">{s.repo ?? "no-repo"}</span></span>
-        {s.branch && <span className="field branch"><span className="field-label">branch</span><span className="field-value">{s.branch}</span></span>}
+        <span className="field branch"><span className="field-label">branch</span><span className="field-value">{s.branch ?? "no-branch"}</span></span>
         <span className="field count"><span className="field-label">prompts</span><span className="field-value">{s.promptCount}</span></span>
       </div>
     </div>
