@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { openDb, linkCommitSession, replacePrompts, upsertCommit, upsertSessions } from "../src/db.ts";
 import {
   activeSession,
+  activityTimeline,
   commitsForSession,
   searchPrompts,
   sessionById,
@@ -111,5 +112,24 @@ describe("query", () => {
     expect(s.linksCorrelated).toBe(1);
     expect(s.byProvider.find((p) => p.provider === "codex")?.prompts).toBe(2);
     expect(s.byRepo[0]).toEqual({ repo: "acme/app", sessions: 2 });
+  });
+
+  test("activityTimeline groups prompts, sessions, and commits by day", () => {
+    const db = seed();
+    const days = activityTimeline(db, 365);
+    expect(days.find((day) => day.day === "2026-01-01")).toEqual({
+      day: "2026-01-01",
+      prompts: 2,
+      sessions: 2,
+      commits: 1,
+      byProvider: { codex: 2 },
+    });
+    expect(days.find((day) => day.day === "2026-01-02")).toEqual({
+      day: "2026-01-02",
+      prompts: 1,
+      sessions: 0,
+      commits: 0,
+      byProvider: { claude: 1 },
+    });
   });
 });

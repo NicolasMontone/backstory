@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type LinkedCommit, type SearchHit, type SessionListItem, type SessionWithPrompts, type Stats } from "./api.ts";
+import { api, type ActivityPoint, type LinkedCommit, type SearchHit, type SessionListItem, type SessionWithPrompts, type Stats } from "./api.ts";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "?";
@@ -135,12 +135,16 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
   return nodes;
 }
 
-function Header({ stats }: { stats: Stats | null }) {
+function Header({ stats, view, onViewChange }: { stats: Stats | null; view: View; onViewChange: (view: View) => void }) {
   return (
     <header className="header">
       <span className="wordmark">
         backstory<span className="dot">.</span>
       </span>
+      <nav className="tabs" aria-label="Backstory views">
+        <button className={view === "prompts" ? "active" : ""} onClick={() => onViewChange("prompts")}>Prompts</button>
+        <button className={view === "observability" ? "active" : ""} onClick={() => onViewChange("observability")}>Observability</button>
+      </nav>
       {stats && (
         <div className="stats">
           <span>
@@ -205,6 +209,41 @@ function CommitList({ commits }: { commits: LinkedCommit[] }) {
   );
 }
 
+function PromptCoach({ session, commits }: { session: SessionWithPrompts; commits: LinkedCommit[] }) {
+  const [copied, setCopied] = useState(false);
+  const brief = [
+    "Review this AI coding session for prompt quality and improvement opportunities.",
+    "Focus on: clarity, context, decomposition, verification, unnecessary turns, and whether the prompts led to useful code changes.",
+    "",
+    `Provider: ${session.provider}`,
+    `Repository: ${session.repo ?? "none"}`,
+    `Branch: ${session.branch ?? "none"}`,
+    `Linked commits: ${commits.length}`,
+    "",
+    "Prompts:",
+    ...session.prompts.map((p) => `#${p.seq}${p.ts ? ` (${p.ts})` : ""}\n${p.text}`),
+    "",
+    "Linked commits:",
+    ...commits.map((c) => `- ${c.sha.slice(0, 10)} ${c.subject ?? "(no subject)"} [${c.source}]`),
+  ].join("\n");
+
+  async function copyBrief() {
+    await navigator.clipboard.writeText(brief);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  return (
+    <div className="coach">
+      <div>
+        <div className="coach-title">Prompt coach</div>
+        <div className="coach-copy">Copy this session with its commits into an LLM for a grounded prompt review.</div>
+      </div>
+      <button className="coach-button" onClick={copyBrief}>{copied ? "Copied" : "Copy review brief"}</button>
+    </div>
+  );
+}
+
 /** Attribute each commit to the latest prompt before it was authored. */
 function commitsForPrompt(prompts: SessionWithPrompts["prompts"], index: number, commits: LinkedCommit[]): LinkedCommit[] {
   return commits.filter((commit) => {
@@ -234,6 +273,7 @@ function Detail({ session, commits }: { session: SessionWithPrompts | null; comm
         <span>{fmtDate(session.startedAt)}</span>
       </div>
       <div className="label">{session.prompts.length} prompt{session.prompts.length === 1 ? "" : "s"}</div>
+      <PromptCoach session={session} commits={commits} />
       {session.prompts.map((p, index) => (
         <div className="prompt" key={p.seq}>
           <div className="num">#{p.seq}{p.ts ? ` · ${fmtDate(p.ts)}` : ""}</div>
@@ -245,6 +285,52 @@ function Detail({ session, commits }: { session: SessionWithPrompts | null; comm
   );
 }
 
+type View = "prompts" | "observability";
+
+function Observability({ points }: { points: ActivityPoint[] }) {
+  const totalPrompts = points.reduce((n, p) => n + p.prompts, 0);
+  const totalSessions = points.reduce((n, p) => n + p.sessions, 0);
+  const totalCommits = points.reduce((n, p) => n + p.commits, 0);
+  const maxPrompts = Math.max(1, ...points.map((p) => p.prompts));
+  const providers = [...new Set(points.flatMap((p) => Object.keys(p.byProvider)))];
+  return (
+    <main className="observability">
+      <div className="observe-heading">
+        <div>
+          <div className="eyebrow">Activity over time</div>
+          <h1>Prompt observability</h1>
+          <p>See how your coding conversations, sessions, and commits move together.</p>
+        </div>
+        <div className="observe-window">last 90 days</div>
+      </div>
+      <div className="observe-cards">
+        <div><span>prompts</span><b>{totalPrompts}</b></div>
+        <div><span>sessions</span><b>{totalSessions}</b></div>
+        <div><span>commits</span><b>{totalCommits}</b></div>
+        <div><span>active days</span><b>{points.length}</b></div>
+      </div>
+      <section className="activity-panel">
+        <div className="panel-heading"><span>Prompt activity</span><span className="legend">{providers.map((p) => <span key={p}><i className={`legend-dot ${p}`} />{p}</span>)}</span></div>
+        <div className="activity-chart">
+          {points.length === 0 && <div className="empty-chart">No activity in this period.</div>}
+          {points.map((p, index) => (
+            <div className="activity-day" key={p.day} title={`${p.day}: ${p.prompts} prompts, ${p.sessions} sessions, ${p.commits} commits`}>
+              <div className="activity-bar">
+                {providers.map((provider) => <i key={provider} className={`activity-segment ${provider}`} style={{ height: `${((p.byProvider[provider] ?? 0) / maxPrompts) * 100}%` }} />)}
+              </div>
+              <span>{index % 7 === 0 ? p.day.slice(5) : ""}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="activity-panel activity-table-panel">
+        <div className="panel-heading"><span>Recent activity</span><span className="faint">prompts · sessions · commits</span></div>
+        {[...points].reverse().slice(0, 12).map((p) => <div className="activity-row" key={p.day}><span>{p.day}</span><b>{p.prompts}</b><b>{p.sessions}</b><b>{p.commits}</b></div>)}
+      </section>
+    </main>
+  );
+}
+
 export function App() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
@@ -253,11 +339,14 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionWithPrompts | null>(null);
   const [commits, setCommits] = useState<LinkedCommit[]>([]);
+  const [timeline, setTimeline] = useState<ActivityPoint[]>([]);
+  const [view, setView] = useState<View>("prompts");
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
     api.sessions().then(setSessions).catch(() => {});
+    api.timeline().then(setTimeline).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -293,8 +382,8 @@ export function App() {
 
   return (
     <div className="app">
-      <Header stats={stats} />
-      <div className="main">
+      <Header stats={stats} view={view} onViewChange={setView} />
+      {view === "observability" ? <Observability points={timeline} /> : <div className="main">
         <aside className="sidebar">
           <div className="searchbar">
             <input
@@ -340,7 +429,7 @@ export function App() {
         <section className="detail">
           <Detail session={detail} commits={commits} />
         </section>
-      </div>
+      </div>}
     </div>
   );
 }

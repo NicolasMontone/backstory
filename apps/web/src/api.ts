@@ -1,5 +1,6 @@
 import type {
   CommitReport,
+  ActivityPoint,
   LinkedCommit,
   PrReport,
   SearchHit,
@@ -19,6 +20,7 @@ async function j<T>(url: string): Promise<T> {
 
 export const api = {
   stats: () => j<Stats>("/api/stats"),
+  timeline: (days = 90) => j<ActivityPoint[]>(`/api/timeline?days=${days}`),
   sessions: (repo?: string) =>
     j<SessionListItem[]>(`/api/sessions${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`),
   session: (id: string) => j<SessionWithPrompts>(`/api/session/${encodeURIComponent(id)}`),
@@ -28,4 +30,4 @@ export const api = {
   pr: (number: number) => j<PrReport>(`/api/pr/${number}`),
 };
 
-export type { CommitReport, LinkedCommit, PrReport, SearchHit, SessionListItem, SessionWithPrompts, Stats };
+export type { ActivityPoint, CommitReport, LinkedCommit, PrReport, SearchHit, SessionListItem, SessionWithPrompts, Stats };

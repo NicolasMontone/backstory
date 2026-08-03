@@ -6,6 +6,7 @@ import { fetchPr, ghReady, type PrInfo } from "./github.ts";
 import { hookProviders, recordHook, type HookInstallResult, type HookProvider, type HookStatus } from "./hooks/index.ts";
 import {
   activeSession,
+  activityTimeline,
   commitInfo,
   commitsForSession,
   listSessions,
@@ -16,6 +17,7 @@ import {
   sessionsForShas,
   stats,
   type CommitInfo,
+  type ActivityPoint,
   type LinkedCommit,
   type SearchHit,
   type SessionListItem,
@@ -150,6 +152,10 @@ export class Backstory {
     return stats(this.db);
   }
 
+  activityTimeline(days?: number): ActivityPoint[] {
+    return activityTimeline(this.db, days);
+  }
+
   /** The registered hook providers (git post-commit, and any future ones). */
   hookProviders(): HookProvider[] {
     return hookProviders();
@@ -176,6 +182,7 @@ export class Backstory {
 }
 
 export type {
+  ActivityPoint,
   CommitInfo,
   PrInfo,
   SearchHit,

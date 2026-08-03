@@ -152,6 +152,52 @@ export interface Stats {
   byRepo: Array<{ repo: string; sessions: number }>;
 }
 
+export interface ActivityPoint {
+  day: string;
+  prompts: number;
+  sessions: number;
+  commits: number;
+  byProvider: Record<string, number>;
+}
+
+export function activityTimeline(db: Database, days = 90): ActivityPoint[] {
+  const since = new Date(Date.now() - Math.max(1, days) * 86_400_000).toISOString();
+  const points = new Map<string, ActivityPoint>();
+  const point = (day: string): ActivityPoint => {
+    const existing = points.get(day);
+    if (existing) return existing;
+    const created = { day, prompts: 0, sessions: 0, commits: 0, byProvider: {} };
+    points.set(day, created);
+    return created;
+  };
+
+  const prompts = db
+    .query(
+      `SELECT substr(p.ts, 1, 10) day, s.provider, COUNT(*) count
+       FROM prompts p JOIN sessions s ON s.id = p.session_id
+       WHERE p.ts IS NOT NULL AND p.ts >= ?
+       GROUP BY day, s.provider`,
+    )
+    .all(since) as Array<{ day: string; provider: string; count: number }>;
+  for (const row of prompts) {
+    const p = point(row.day);
+    p.prompts += row.count;
+    p.byProvider[row.provider] = (p.byProvider[row.provider] ?? 0) + row.count;
+  }
+
+  const sessions = db
+    .query(`SELECT substr(started_at, 1, 10) day, COUNT(*) count FROM sessions WHERE started_at >= ? GROUP BY day`)
+    .all(since) as Array<{ day: string; count: number }>;
+  for (const row of sessions) point(row.day).sessions = row.count;
+
+  const commits = db
+    .query(`SELECT substr(authored_at, 1, 10) day, COUNT(*) count FROM commits WHERE authored_at >= ? GROUP BY day`)
+    .all(since) as Array<{ day: string; count: number }>;
+  for (const row of commits) point(row.day).commits = row.count;
+
+  return [...points.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
 export function stats(db: Database): Stats {
   const one = (sql: string): number => (db.query(sql).get() as { n: number } | null)?.n ?? 0;
   return {

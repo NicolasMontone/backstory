@@ -32,6 +32,7 @@ async function handleApi(bs: Backstory, url: URL): Promise<Response> {
 
   try {
     if (p === "stats") return json(bs.stats());
+    if (p === "timeline") return json(bs.activityTimeline(q.get("days") ? Number(q.get("days")) : undefined));
     if (p === "sessions")
       return json(bs.sessions({ limit: q.get("limit") ? Number(q.get("limit")) : 200, repo: q.get("repo") ?? undefined }));
     if (seg[0] === "session" && seg[1]) {
