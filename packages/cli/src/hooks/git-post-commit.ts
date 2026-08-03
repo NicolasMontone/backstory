@@ -3,7 +3,7 @@ import { $ } from "bun";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { linkCommitSession, upsertCommit } from "../db.ts";
-import { repoRoot, resolveSha, showCommit } from "../git.ts";
+import { normalizeRepo, remoteUrl, repoRoot, resolveSha, showCommit } from "../git.ts";
 import type { HookInstallResult, HookProvider, HookStatus } from "./types.ts";
 
 const MARKER = "# >>> backstory post-commit >>>";
@@ -68,17 +68,20 @@ export async function recordHook(
   const root = (await repoRoot(dir)) ?? dir;
   const sha = await resolveSha(dir, "HEAD");
   if (!sha) return null;
-  const session = findActiveSession(root, 60 * 60_000); // active within the last hour
-  if (!session) return null;
-
   const meta = await showCommit(dir, sha);
+  const origin = await remoteUrl(root);
+  const session = findActiveSession(root, 60 * 60_000); // active within the last hour
+  const sessionMeta = session
+    ? (db.query(`SELECT repo FROM sessions WHERE id = ?`).get(session.id) as { repo: string | null } | null)
+    : null;
   upsertCommit(db, {
     sha,
-    repo: null,
+    repo: normalizeRepo(origin) ?? sessionMeta?.repo ?? null,
     authoredAt: meta?.authoredAt ?? null,
     author: meta?.author ?? null,
     subject: meta?.subject ?? null,
   });
+  if (!session) return null;
   linkCommitSession(db, sha, session.id, "hook");
   return { sha, sessionId: session.id };
 }

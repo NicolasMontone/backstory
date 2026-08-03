@@ -54,6 +54,7 @@ describe("recordHook", () => {
     expect(res).toEqual({ sha, sessionId: "active" });
     const row = db.query(`SELECT source FROM commit_sessions WHERE sha=? AND session_id='active'`).get(sha) as any;
     expect(row.source).toBe("hook");
+    expect((db.query(`SELECT repo FROM commits WHERE sha=?`).get(sha) as any).repo).toBe("acme/app");
   });
 
   test("no-op when there is no active session", async () => {
@@ -64,6 +65,7 @@ describe("recordHook", () => {
     const res = await recordHook(db, dir, () => null);
     expect(res).toBeNull();
     expect((db.query(`SELECT COUNT(*) n FROM commit_sessions`).get() as any).n).toBe(0);
+    expect((db.query(`SELECT COUNT(*) n FROM commits`).get() as any).n).toBe(1);
   });
 });
 

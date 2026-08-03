@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { $ } from "bun";
 import { linkCommitSession, upsertCommit } from "./db.ts";
-import { gitIdentity, logCommits, repoRoot } from "./git.ts";
+import { gitIdentity, logCommits, normalizeRepo, remoteUrl, repoRoot } from "./git.ts";
 
 interface SessionRow {
   id: string;
@@ -42,7 +42,7 @@ export async function correlate(
   const allowEmails = new Set((opts.authorEmails ?? []).map((e) => e.toLowerCase()).filter(Boolean));
 
   const sessions = db
-    .query(`SELECT id, cwd, repo, branch, started_at, ended_at FROM sessions WHERE repo IS NOT NULL AND cwd <> ''`)
+    .query(`SELECT id, cwd, repo, branch, started_at, ended_at FROM sessions WHERE cwd <> ''`)
     .all() as SessionRow[];
 
   // Group sessions by working directory so we scan each repo's git log once.
@@ -58,6 +58,19 @@ export async function correlate(
 
   for (const [cwd, group] of byCwd) {
     const root = (await repoRoot(cwd)) ?? cwd;
+    // Provider logs can be created before a remote is configured, or may omit
+    // git metadata entirely. The cwd is still authoritative for local
+    // correlation, and the current remote lets us repair the durable repo key
+    // used by PR lookup later.
+    const origin = await remoteUrl(root);
+    const inferredRepo = normalizeRepo(origin);
+    if (inferredRepo) {
+      const repair = db.prepare(`UPDATE sessions SET repo = COALESCE(repo, ?), repository_url = COALESCE(repository_url, ?) WHERE id = ?`);
+      for (const s of group) {
+        repair.run(inferredRepo, origin, s.id);
+        if (!s.repo) s.repo = inferredRepo;
+      }
+    }
     // Build the per-repo allowed-author set: explicit override, else this repo's
     // configured git identity. If we can't determine one, accept any author.
     const emails = new Set(allowEmails);
@@ -71,7 +84,7 @@ export async function correlate(
     if (commits.length === 0) continue;
     commitsSeen += commits.length;
 
-    const repo = group.find((g) => g.repo)?.repo ?? null;
+    const repo = group.find((g) => g.repo)?.repo ?? inferredRepo;
     for (const c of commits) {
       upsertCommit(db, { sha: c.sha, repo, authoredAt: c.authoredAt, author: c.author, subject: c.subject });
     }

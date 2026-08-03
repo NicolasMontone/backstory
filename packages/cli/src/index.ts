@@ -52,6 +52,19 @@ function renderSessions(sessions: SessionWithPrompts[], opts: { full?: boolean }
   }
 }
 
+function renderLinkedCommits(commits: ReturnType<Backstory["sessionCommits"]>): void {
+  if (commits.length === 0) {
+    console.log(dim("  (no linked commits)"));
+    return;
+  }
+  console.log(bold("\nlinked commits"));
+  for (const commit of commits) {
+    const source = commit.source === "hook" ? green("● exact") : yellow("~ correlated");
+    console.log(`  ${commit.sha.slice(0, 12)}  ${commit.subject ?? "(no subject)"}  ${source}`);
+    if (commit.repo) console.log(dim(`    ${commit.repo} · ${fmtDate(commit.authoredAt)}`));
+  }
+}
+
 // ---- arg parsing -------------------------------------------------------------
 const COMMON = {
   json: { type: "boolean" },
@@ -157,7 +170,11 @@ function cmdSession(args: string[]): void {
   using bs = Backstory.open();
   const s = bs.session(id);
   if (!s) return fail(`no session ${id}`);
-  emit(Boolean(values.json), s, () => renderSessions([s], { full: true }));
+  const commits = bs.sessionCommits(id);
+  emit(Boolean(values.json), { session: s, commits }, () => {
+    renderSessions([s], { full: true });
+    renderLinkedCommits(commits);
+  });
 }
 
 function cmdSearch(args: string[]): void {

@@ -69,4 +69,30 @@ describe("correlate", () => {
     await correlate(db); // no authorEmails → uses `git config user.email`
     expect(linkedShas(db)).toEqual([c]);
   });
+
+  test("recovers the repo from the session cwd when the provider log has no remote", async () => {
+    const dir = await makeRepo({ email: "solo@example.com", name: "Solo", remote: "git@github.com:acme/recover.git" });
+    repos.push(dir);
+    const c = await commit(dir, { date: "2026-03-02T12:00:00Z", email: "solo@example.com", name: "Solo", msg: "recover" });
+    const db = openDb(":memory:");
+    upsertSessions(db, [
+      {
+        id: "s-null-repo",
+        provider: "codex",
+        cwd: dir,
+        repo: null,
+        repositoryUrl: null,
+        branch: "main",
+        startCommit: null,
+        startedAt: "2026-03-02T11:50:00Z",
+        endedAt: "2026-03-02T12:10:00Z",
+        title: null,
+        sourcePath: "/p",
+      },
+    ]);
+
+    await correlate(db);
+    expect(linkedShas(db)).toEqual([c]);
+    expect((db.query(`SELECT repo FROM sessions WHERE id='s-null-repo'`).get() as { repo: string }).repo).toBe("acme/recover");
+  });
 });
