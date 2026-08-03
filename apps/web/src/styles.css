@@ -431,38 +431,6 @@ body {
   margin: 4px 0 12px;
 }
 
-.coach {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
-}
-.coach-title {
-  font-size: 12px;
-  font-weight: 600;
-}
-.coach-copy {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.coach-button {
-  flex: 0 0 auto;
-  padding: 7px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--accent);
-  cursor: pointer;
-  font: 11px var(--mono);
-}
-.coach-button:hover { background: var(--panel-2); }
-
 .observability {
   overflow-y: auto;
   min-height: 0;
@@ -509,12 +477,17 @@ body {
 .legend-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .legend-dot.codex { background: var(--codex); }
 .legend-dot.claude { background: var(--claude); }
-.activity-chart { display: flex; align-items: flex-end; gap: 5px; height: 190px; overflow-x: auto; padding: 0 2px; }
-.activity-day { display: flex; flex: 1 0 12px; min-width: 12px; height: 100%; flex-direction: column; justify-content: flex-end; align-items: center; gap: 7px; color: var(--faint); font: 9px var(--mono); }
-.activity-bar { display: flex; flex-direction: column-reverse; justify-content: flex-start; width: 100%; height: 160px; min-height: 2px; border-radius: 3px 3px 0 0; overflow: hidden; background: var(--panel-2); }
-.activity-segment { display: block; min-height: 0; }
-.activity-segment.codex { background: var(--codex); }
-.activity-segment.claude { background: var(--claude); }
+.activity-chart-wrap { min-height: 285px; }
+.activity-chart-svg { display: block; width: 100%; height: auto; min-height: 220px; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-axis-label,
+.chart-date-label { fill: var(--faint); font: 11px var(--mono); }
+.activity-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.activity-line.codex { stroke: var(--codex); }
+.activity-line.claude { stroke: var(--claude); }
+.activity-point { stroke: var(--panel); stroke-width: 2; }
+.activity-point.codex { fill: var(--codex); }
+.activity-point.claude { fill: var(--claude); }
 .empty-chart { margin: auto; color: var(--faint); font: 12px var(--mono); }
 .faint { color: var(--faint); letter-spacing: 0; text-transform: none; }
 .activity-table-panel { padding-bottom: 8px; }

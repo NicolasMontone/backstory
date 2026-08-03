@@ -209,41 +209,6 @@ function CommitList({ commits }: { commits: LinkedCommit[] }) {
   );
 }
 
-function PromptCoach({ session, commits }: { session: SessionWithPrompts; commits: LinkedCommit[] }) {
-  const [copied, setCopied] = useState(false);
-  const brief = [
-    "Review this AI coding session for prompt quality and improvement opportunities.",
-    "Focus on: clarity, context, decomposition, verification, unnecessary turns, and whether the prompts led to useful code changes.",
-    "",
-    `Provider: ${session.provider}`,
-    `Repository: ${session.repo ?? "none"}`,
-    `Branch: ${session.branch ?? "none"}`,
-    `Linked commits: ${commits.length}`,
-    "",
-    "Prompts:",
-    ...session.prompts.map((p) => `#${p.seq}${p.ts ? ` (${p.ts})` : ""}\n${p.text}`),
-    "",
-    "Linked commits:",
-    ...commits.map((c) => `- ${c.sha.slice(0, 10)} ${c.subject ?? "(no subject)"} [${c.source}]`),
-  ].join("\n");
-
-  async function copyBrief() {
-    await navigator.clipboard.writeText(brief);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-  }
-
-  return (
-    <div className="coach">
-      <div>
-        <div className="coach-title">Prompt coach</div>
-        <div className="coach-copy">Copy this session with its commits into an LLM for a grounded prompt review.</div>
-      </div>
-      <button className="coach-button" onClick={copyBrief}>{copied ? "Copied" : "Copy review brief"}</button>
-    </div>
-  );
-}
-
 /** Attribute each commit to the latest prompt before it was authored. */
 function commitsForPrompt(prompts: SessionWithPrompts["prompts"], index: number, commits: LinkedCommit[]): LinkedCommit[] {
   return commits.filter((commit) => {
@@ -273,7 +238,6 @@ function Detail({ session, commits }: { session: SessionWithPrompts | null; comm
         <span>{fmtDate(session.startedAt)}</span>
       </div>
       <div className="label">{session.prompts.length} prompt{session.prompts.length === 1 ? "" : "s"}</div>
-      <PromptCoach session={session} commits={commits} />
       {session.prompts.map((p, index) => (
         <div className="prompt" key={p.seq}>
           <div className="num">#{p.seq}{p.ts ? ` · ${fmtDate(p.ts)}` : ""}</div>
@@ -285,13 +249,39 @@ function Detail({ session, commits }: { session: SessionWithPrompts | null; comm
   );
 }
 
+function ActivityChart({ points, providers }: { points: ActivityPoint[]; providers: string[] }) {
+  const width = 1000;
+  const height = 285;
+  const pad = { top: 22, right: 24, bottom: 38, left: 46 };
+  const chartWidth = width - pad.left - pad.right;
+  const chartHeight = height - pad.top - pad.bottom;
+  const max = Math.max(1, ...points.map((p) => p.prompts));
+  const x = (index: number) => pad.left + (points.length <= 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth);
+  const y = (value: number) => pad.top + chartHeight - (value / max) * chartHeight;
+  const path = (provider: string) => points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.byProvider[provider] ?? 0).toFixed(1)}`).join(" ");
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const dateTicks = points.length > 0 ? [0, Math.floor((points.length - 1) / 4), Math.floor((points.length - 1) / 2), Math.floor((points.length - 1) * 0.75), points.length - 1] : [];
+
+  return (
+    <div className="activity-chart-wrap">
+      {points.length === 0 ? <div className="empty-chart">No activity in this period.</div> : (
+        <svg className="activity-chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Prompt activity over time">
+          {ticks.map((tick) => <g key={tick}><line className="chart-grid" x1={pad.left} x2={width - pad.right} y1={y(max * tick)} y2={y(max * tick)} /><text className="chart-axis-label" x={pad.left - 10} y={y(max * tick) + 4} textAnchor="end">{Math.round(max * tick)}</text></g>)}
+          {providers.map((provider) => <path key={provider} className={`activity-line ${provider}`} d={path(provider)} />)}
+          {points.map((p, i) => providers.map((provider) => (p.byProvider[provider] ?? 0) > 0 && <circle key={`${p.day}-${provider}`} className={`activity-point ${provider}`} cx={x(i)} cy={y(p.byProvider[provider])} r="3"><title>{`${p.day} · ${provider}: ${p.byProvider[provider]} prompts · ${p.sessions} sessions · ${p.commits} commits`}</title></circle>))}
+          {dateTicks.map((index) => <text key={index} className="chart-date-label" x={x(index)} y={height - 10} textAnchor="middle">{points[index]?.day.slice(5)}</text>)}
+        </svg>
+      )}
+    </div>
+  );
+}
+
 type View = "prompts" | "observability";
 
 function Observability({ points }: { points: ActivityPoint[] }) {
   const totalPrompts = points.reduce((n, p) => n + p.prompts, 0);
   const totalSessions = points.reduce((n, p) => n + p.sessions, 0);
   const totalCommits = points.reduce((n, p) => n + p.commits, 0);
-  const maxPrompts = Math.max(1, ...points.map((p) => p.prompts));
   const providers = [...new Set(points.flatMap((p) => Object.keys(p.byProvider)))];
   return (
     <main className="observability">
@@ -311,17 +301,7 @@ function Observability({ points }: { points: ActivityPoint[] }) {
       </div>
       <section className="activity-panel">
         <div className="panel-heading"><span>Prompt activity</span><span className="legend">{providers.map((p) => <span key={p}><i className={`legend-dot ${p}`} />{p}</span>)}</span></div>
-        <div className="activity-chart">
-          {points.length === 0 && <div className="empty-chart">No activity in this period.</div>}
-          {points.map((p, index) => (
-            <div className="activity-day" key={p.day} title={`${p.day}: ${p.prompts} prompts, ${p.sessions} sessions, ${p.commits} commits`}>
-              <div className="activity-bar">
-                {providers.map((provider) => <i key={provider} className={`activity-segment ${provider}`} style={{ height: `${((p.byProvider[provider] ?? 0) / maxPrompts) * 100}%` }} />)}
-              </div>
-              <span>{index % 7 === 0 ? p.day.slice(5) : ""}</span>
-            </div>
-          ))}
-        </div>
+        <ActivityChart points={points} providers={providers} />
       </section>
       <section className="activity-panel activity-table-panel">
         <div className="panel-heading"><span>Recent activity</span><span className="faint">prompts · sessions · commits</span></div>
