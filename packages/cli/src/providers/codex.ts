@@ -5,16 +5,17 @@ import { join } from "node:path";
 import { normalizeRepo } from "../git.ts";
 import type { IngestResult, PromptRecord, Provider, SessionRecord } from "./types.ts";
 
-const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), ".codex");
-const SESSIONS_DIR = join(CODEX_HOME, "sessions");
-const INDEX_FILE = join(CODEX_HOME, "session_index.jsonl");
+// Read lazily so tests (and CODEX_HOME overrides) take effect at call time.
+const codexHome = () => process.env.CODEX_HOME || join(homedir(), ".codex");
+const sessionsDir = () => join(codexHome(), "sessions");
+const indexFile = () => join(codexHome(), "session_index.jsonl");
 
 /**
  * Injected, non-user text that Codex prepends to the conversation as
  * `role: "user"` messages. These are AGENTS.md contents, app context, and
  * environment blocks — not prompts the human typed. We drop them.
  */
-function isInjectedContext(text: string): boolean {
+export function isInjectedContext(text: string): boolean {
   const t = text.trimStart();
   if (t.startsWith("<")) return true; // <app-context>, <user_instructions>, <environment_context>, ...
   if (t.startsWith("# AGENTS.md")) return true;
@@ -25,9 +26,10 @@ function isInjectedContext(text: string): boolean {
 /** Load session_index.jsonl into id -> {title, updatedAt}. Best-effort. */
 async function loadIndex(): Promise<Map<string, { title: string | null; updatedAt: string | null }>> {
   const map = new Map<string, { title: string | null; updatedAt: string | null }>();
-  if (!existsSync(INDEX_FILE)) return map;
+  const file = indexFile();
+  if (!existsSync(file)) return map;
   try {
-    const text = await readFile(INDEX_FILE, "utf8");
+    const text = await readFile(file, "utf8");
     for (const line of text.split("\n")) {
       if (!line.trim()) continue;
       try {
@@ -133,16 +135,21 @@ async function parseFile(
   return { session: meta, prompts };
 }
 
+/** Parse a single rollout file with a fresh (empty) index — for tests/tools. */
+export async function parseCodexFile(path: string): Promise<ParsedSession | null> {
+  return parseFile(path, new Map());
+}
+
 export const codexProvider: Provider = {
   name: "codex",
 
   isAvailable(): boolean {
-    return existsSync(SESSIONS_DIR);
+    return existsSync(sessionsDir());
   },
 
   async ingest({ since }): Promise<IngestResult> {
     const index = await loadIndex();
-    const files = await findSessionFiles(SESSIONS_DIR);
+    const files = await findSessionFiles(sessionsDir());
     const sessions: SessionRecord[] = [];
     const prompts: PromptRecord[] = [];
 

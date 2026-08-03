@@ -6,15 +6,23 @@ Link the prompts you gave your AI coding agents to the commits and PRs they prod
 prompt you typed, and joins them to git — so you can ask *"what did I ask to get this
 commit?"* or *"which prompts are behind this PR?"*.
 
-Today it ingests **Codex** sessions (`~/.codex/sessions`). Claude Code is next; the
-provider layer is built to make adding it small.
+It ingests **Codex** (`~/.codex/sessions`) and **Claude Code**
+(`~/.claude/projects`) sessions today. The provider layer is small to extend.
 
 ```
 bs commit HEAD          # prompts behind a commit
 bs pr 27901             # prompts behind a GitHub PR
 bs branch my-feature    # prompts on a branch
+bs session <id>         # every prompt in one session
 bs search "raindrop"    # full-text search across all your prompts
 bs sessions             # recent sessions
+bs stats                # totals by provider & repo
+```
+
+Every read command takes `--json` for machine/LLM consumption:
+
+```bash
+bs commit HEAD --json | jq '.sessions[].prompts[].text'
 ```
 
 ## How linking works (hybrid)
@@ -48,7 +56,28 @@ cd packages/cli && bun link
 ```
 
 Run `bs ingest` first, and again after new agent work, to refresh the index. Use
-`bs ingest --full` to rebuild from scratch.
+`bs ingest --full` to rebuild from scratch, and `--author you@email` to override the
+git identities that count as "yours" during correlation.
+
+## Programmatic API
+
+The core is a type-safe class, exported from the package so other apps (e.g. a web
+viewer) can reuse it without shelling out:
+
+```ts
+import { Backstory } from "@backstory/cli";
+
+using bs = Backstory.open();               // opens the SQLite index
+await bs.ingest();                          // parse + correlate
+const { sessions } = bs.commitReport(sha);  // fully typed report
+```
+
+## Tests
+
+```bash
+pnpm --filter @backstory/cli test        # bun test
+pnpm --filter @backstory/cli typecheck
+```
 
 ## Data
 

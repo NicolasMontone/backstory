@@ -63,6 +63,11 @@ export function commitInfo(db: Database, sha: string): CommitInfo | null {
   return { sha: c.sha, repo: c.repo, subject: c.subject, author: c.author, authoredAt: c.authored_at };
 }
 
+export function sessionById(db: Database, id: string): SessionWithPrompts | null {
+  const [s] = hydrate(db, [{ id }]);
+  return s ?? null;
+}
+
 export function sessionsForCommit(db: Database, sha: string): SessionWithPrompts[] {
   const rows = db
     .query(`SELECT session_id AS id, source FROM commit_sessions WHERE sha = ? ORDER BY source DESC`)
@@ -113,6 +118,42 @@ export function listSessions(db: Database, opts: { limit?: number; repo?: string
        ORDER BY s.ended_at DESC LIMIT ?`,
     )
     .all(...params) as SessionListItem[];
+}
+
+export interface Stats {
+  sessions: number;
+  prompts: number;
+  commits: number;
+  links: number;
+  linksExact: number;
+  linksCorrelated: number;
+  byProvider: Array<{ provider: string; sessions: number; prompts: number }>;
+  byRepo: Array<{ repo: string; sessions: number }>;
+}
+
+export function stats(db: Database): Stats {
+  const one = (sql: string): number => (db.query(sql).get() as { n: number } | null)?.n ?? 0;
+  return {
+    sessions: one(`SELECT COUNT(*) n FROM sessions`),
+    prompts: one(`SELECT COUNT(*) n FROM prompts`),
+    commits: one(`SELECT COUNT(*) n FROM commits`),
+    links: one(`SELECT COUNT(*) n FROM commit_sessions`),
+    linksExact: one(`SELECT COUNT(*) n FROM commit_sessions WHERE source='hook'`),
+    linksCorrelated: one(`SELECT COUNT(*) n FROM commit_sessions WHERE source='correlated'`),
+    byProvider: db
+      .query(
+        `SELECT s.provider, COUNT(DISTINCT s.id) sessions, COUNT(p.seq) prompts
+         FROM sessions s LEFT JOIN prompts p ON p.session_id = s.id
+         GROUP BY s.provider ORDER BY sessions DESC`,
+      )
+      .all() as Stats["byProvider"],
+    byRepo: db
+      .query(
+        `SELECT COALESCE(repo,'(no repo)') repo, COUNT(*) sessions
+         FROM sessions GROUP BY repo ORDER BY sessions DESC LIMIT 15`,
+      )
+      .all() as Stats["byRepo"],
+  };
 }
 
 export interface SearchHit {
