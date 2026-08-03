@@ -1,7 +1,7 @@
 import { describe, expect, test, afterAll } from "bun:test";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { installHook, recordHook } from "../src/hook.ts";
+import { gitPostCommitHook, installHook, recordHook } from "../src/hooks/git-post-commit.ts";
 import { openDb, upsertSessions } from "../src/db.ts";
 import { commit, makeRepo, rm } from "./helpers.ts";
 
@@ -64,5 +64,28 @@ describe("recordHook", () => {
     const res = await recordHook(db, dir, () => null);
     expect(res).toBeNull();
     expect((db.query(`SELECT COUNT(*) n FROM commit_sessions`).get() as any).n).toBe(0);
+  });
+});
+
+describe("GitPostCommitHookProvider (HookProvider interface)", () => {
+  test("isSupported / status / install", async () => {
+    const dir = await makeRepo();
+    repos.push(dir);
+    expect(await gitPostCommitHook.isSupported(dir)).toBe(true);
+
+    const before = await gitPostCommitHook.status(dir);
+    expect(before).toMatchObject({ provider: "git-post-commit", supported: true, installed: false });
+
+    const res = await gitPostCommitHook.install(dir);
+    expect(res.installed).toBe(true);
+
+    const after = await gitPostCommitHook.status(dir);
+    expect(after.installed).toBe(true);
+  });
+
+  test("unsupported outside a git repo", async () => {
+    expect(await gitPostCommitHook.isSupported("/nonexistent-xyz")).toBe(false);
+    const st = await gitPostCommitHook.status("/nonexistent-xyz");
+    expect(st).toMatchObject({ supported: false, installed: false });
   });
 });

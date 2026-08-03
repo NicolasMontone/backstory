@@ -43,6 +43,12 @@ export interface IngestResult {
   prompts: PromptRecord[];
 }
 
+/** One parsed session file: its metadata plus the prompts found in it. */
+export interface ParsedSession {
+  session: SessionRecord;
+  prompts: PromptRecord[];
+}
+
 export interface Provider {
   name: string;
   /** True if this provider's data appears to exist on this machine. */

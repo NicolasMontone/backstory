@@ -190,11 +190,29 @@ function cmdStats(args: string[]): void {
 
 async function cmdHook(args: string[]): Promise<void> {
   const sub = args[0];
+  const { values } = parse(args.slice(1));
   if (sub === "install") {
     using bs = Backstory.open();
-    const { path, created } = await bs.installHook(process.cwd());
-    console.log(`${green("✓")} post-commit hook ${created ? "installed" : "updated"} at ${dim(path)}`);
-    console.log(dim("  New commits in this repo will be stamped with the active session (exact links)."));
+    const results = await bs.installHooks(process.cwd());
+    emit(Boolean(values.json), results, () => {
+      if (results.length === 0) {
+        console.log(dim("no supported hooks here (not a git repository?)"));
+        return;
+      }
+      for (const r of results) console.log(`${green("✓")} ${r.provider}: ${dim(r.detail)}`);
+      console.log(dim("New commits will be stamped with the active session (exact links)."));
+    });
+    return;
+  }
+  if (sub === "status") {
+    using bs = Backstory.open();
+    const statuses = await bs.hookStatus(process.cwd());
+    emit(Boolean(values.json), statuses, () => {
+      for (const s of statuses) {
+        const mark = !s.supported ? dim("— n/a") : s.installed ? green("● installed") : yellow("○ not installed");
+        console.log(`${mark}  ${bold(s.provider)} ${dim(s.detail ?? "")}`);
+      }
+    });
     return;
   }
   if (sub === "record") {
@@ -204,7 +222,7 @@ async function cmdHook(args: string[]): Promise<void> {
     if (res) console.log(dim(`backstory: linked ${res.sha.slice(0, 8)} → ${res.sessionId}`));
     return;
   }
-  fail("usage: bs hook <install|record>");
+  fail("usage: bs hook <install|status|record>");
 }
 
 function fail(msg: string): void {
@@ -225,7 +243,7 @@ ${bold("usage:")} bs <command> [args]   ${dim("(add --json to any read command f
   ${cyan("session")} <id>                                     Full prompt list for one session
   ${cyan("search")} <text> [--limit N]                        Full-text search across prompts
   ${cyan("stats")}                                            Index totals, by provider & repo
-  ${cyan("hook install")}                                     Install a git post-commit hook for exact links
+  ${cyan("hook install")} | ${cyan("hook status")}                    Install / check exact-linking hooks
 
   Run ${bold("bs ingest")} first (and after new agent work) to refresh the index.
   Links marked ${green("● exact")} come from the hook; ${yellow("~ correlated")} are inferred by repo+branch+time.`);

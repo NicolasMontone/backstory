@@ -1,9 +1,12 @@
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { normalizeRepo } from "../git.ts";
-import type { IngestResult, PromptRecord, Provider, SessionRecord } from "./types.ts";
+import { JsonlSessionProvider } from "./base.ts";
+import type { ParsedSession, PromptRecord, SessionRecord } from "./types.ts";
+
+type CodexIndex = Map<string, { title: string | null; updatedAt: string | null }>;
 
 // Read lazily so tests (and CODEX_HOME overrides) take effect at call time.
 const codexHome = () => process.env.CODEX_HOME || join(homedir(), ".codex");
@@ -24,8 +27,8 @@ export function isInjectedContext(text: string): boolean {
 }
 
 /** Load session_index.jsonl into id -> {title, updatedAt}. Best-effort. */
-async function loadIndex(): Promise<Map<string, { title: string | null; updatedAt: string | null }>> {
-  const map = new Map<string, { title: string | null; updatedAt: string | null }>();
+async function loadIndex(): Promise<CodexIndex> {
+  const map: CodexIndex = new Map();
   const file = indexFile();
   if (!existsSync(file)) return map;
   try {
@@ -45,32 +48,8 @@ async function loadIndex(): Promise<Map<string, { title: string | null; updatedA
   return map;
 }
 
-/** Recursively collect all rollout-*.jsonl paths under the sessions dir. */
-async function findSessionFiles(dir: string, out: string[] = []): Promise<string[]> {
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const e of entries) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) await findSessionFiles(p, out);
-    else if (e.isFile() && e.name.endsWith(".jsonl") && e.name.startsWith("rollout-")) out.push(p);
-  }
-  return out;
-}
-
-interface ParsedSession {
-  session: SessionRecord;
-  prompts: PromptRecord[];
-}
-
 /** Parse one rollout JSONL file into a session + its prompts. */
-async function parseFile(
-  path: string,
-  index: Map<string, { title: string | null; updatedAt: string | null }>,
-): Promise<ParsedSession | null> {
+async function parseCodexRollout(path: string, index: CodexIndex): Promise<ParsedSession | null> {
   let text: string;
   try {
     text = await readFile(path, "utf8");
@@ -137,38 +116,30 @@ async function parseFile(
 
 /** Parse a single rollout file with a fresh (empty) index — for tests/tools. */
 export async function parseCodexFile(path: string): Promise<ParsedSession | null> {
-  return parseFile(path, new Map());
+  return parseCodexRollout(path, new Map());
 }
 
-export const codexProvider: Provider = {
-  name: "codex",
+/** Codex CLI — reads rollout-*.jsonl session files under ~/.codex/sessions. */
+export class CodexProvider extends JsonlSessionProvider {
+  readonly name = "codex";
+  private index: CodexIndex = new Map();
 
-  isAvailable(): boolean {
-    return existsSync(sessionsDir());
-  },
+  protected rootDir(): string | null {
+    return sessionsDir();
+  }
 
-  async ingest({ since }): Promise<IngestResult> {
-    const index = await loadIndex();
-    const files = await findSessionFiles(sessionsDir());
-    const sessions: SessionRecord[] = [];
-    const prompts: PromptRecord[] = [];
+  protected accept(path: string): boolean {
+    // Codex names every session file rollout-*.jsonl.
+    return path.endsWith(".jsonl") && path.includes("rollout-");
+  }
 
-    for (const file of files) {
-      if (since) {
-        // Cheap skip using file mtime before reading contents.
-        try {
-          const st = await stat(file);
-          if (st.mtime.toISOString() < since) continue;
-        } catch {
-          /* fall through and parse */
-        }
-      }
-      const parsed = await parseFile(file, index);
-      if (!parsed) continue;
-      sessions.push(parsed.session);
-      prompts.push(...parsed.prompts);
-    }
+  protected async prepare(): Promise<void> {
+    this.index = await loadIndex();
+  }
 
-    return { sessions, prompts };
-  },
-};
+  protected parseFile(path: string): Promise<ParsedSession | null> {
+    return parseCodexRollout(path, this.index);
+  }
+}
+
+export const codexProvider = new CodexProvider();

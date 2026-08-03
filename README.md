@@ -92,5 +92,18 @@ pnpm monorepo:
 - `packages/cli` — the `bs` CLI (Bun + `bun:sqlite`).
 - `apps/` — reserved for future apps (e.g. a landing page / web viewer).
 
-Provider parsers live in `packages/cli/src/providers/`. To add an agent, implement the
-`Provider` interface in `providers/types.ts`.
+### Extending
+
+**Add an AI agent** — most agents store one JSONL session per file, so extend
+`JsonlSessionProvider` (`providers/base.ts`): declare `rootDir()` and implement
+`parseFile()`, then register it in `providers/index.ts`. The base class handles
+directory walking, `isAvailable()`, and incremental `--since` skipping. Codex and
+Claude Code are the two built-ins.
+
+**Add an exact-linking mechanism** — implement `HookProvider` (`hooks/types.ts`) and
+register it in `hooks/index.ts`. The built-in `git-post-commit` hook is agent-agnostic;
+a future one could use an agent's own hooks (e.g. Claude Code hooks, Codex `notify`) to
+record the producing session with no time-window guessing.
+
+Both layers use a small registry, and the typed `Backstory` API exposes
+`sessionProviders()`, `hookProviders()`, `installHooks()`, and `hookStatus()`.

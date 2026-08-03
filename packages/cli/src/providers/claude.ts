@@ -1,9 +1,9 @@
-import { readdir, readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { normalizeRepo, remoteUrl } from "../git.ts";
-import type { IngestResult, PromptRecord, Provider, SessionRecord } from "./types.ts";
+import { JsonlSessionProvider } from "./base.ts";
+import type { ParsedSession, PromptRecord, SessionRecord } from "./types.ts";
 
 // Read lazily so tests (and CLAUDE_CONFIG_DIR overrides) take effect at call time.
 const claudeHome = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
@@ -108,49 +108,35 @@ export async function parseClaudeFile(path: string): Promise<ParsedClaudeSession
   };
 }
 
-async function findSessionFiles(dir: string, out: string[] = []): Promise<string[]> {
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return out;
+/** Claude Code — sessions at `~/.claude/projects/<encoded-cwd>/<uuid>.jsonl`. */
+export class ClaudeProvider extends JsonlSessionProvider {
+  readonly name = "claude";
+  // Claude Code doesn't store the repo URL, so we resolve it from the cwd's
+  // git remote. Cache per cwd across files within one ingest.
+  private remoteCache = new Map<string, string | null>();
+
+  protected rootDir(): string | null {
+    return projectsDir();
   }
-  for (const e of entries) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) await findSessionFiles(p, out);
-    else if (e.isFile() && e.name.endsWith(".jsonl")) out.push(p);
+
+  protected async prepare(): Promise<void> {
+    this.remoteCache.clear();
   }
-  return out;
+
+  protected async parseFile(path: string): Promise<ParsedSession | null> {
+    const parsed = await parseClaudeFile(path);
+    if (!parsed) return null;
+    const cwd = parsed.session.cwd;
+    let repositoryUrl: string | null = null;
+    if (cwd) {
+      if (!this.remoteCache.has(cwd)) this.remoteCache.set(cwd, await remoteUrl(cwd));
+      repositoryUrl = this.remoteCache.get(cwd)!;
+    }
+    return {
+      session: { ...parsed.session, repositoryUrl, repo: normalizeRepo(repositoryUrl) },
+      prompts: parsed.prompts,
+    };
+  }
 }
 
-export const claudeProvider: Provider = {
-  name: "claude",
-
-  isAvailable(): boolean {
-    return existsSync(projectsDir());
-  },
-
-  async ingest({ since }): Promise<IngestResult> {
-    const files = await findSessionFiles(projectsDir());
-    const sessions: SessionRecord[] = [];
-    const prompts: PromptRecord[] = [];
-    const remoteCache = new Map<string, string | null>();
-
-    for (const file of files) {
-      const parsed = await parseClaudeFile(file);
-      if (!parsed) continue;
-      if (since && parsed.session.endedAt < since) continue;
-      // Derive repo from the working dir's git remote (cached per cwd).
-      const cwd = parsed.session.cwd;
-      let repositoryUrl: string | null = null;
-      if (cwd) {
-        if (!remoteCache.has(cwd)) remoteCache.set(cwd, await remoteUrl(cwd));
-        repositoryUrl = remoteCache.get(cwd)!;
-      }
-      sessions.push({ ...parsed.session, repositoryUrl, repo: normalizeRepo(repositoryUrl) });
-      prompts.push(...parsed.prompts);
-    }
-
-    return { sessions, prompts };
-  },
-};
+export const claudeProvider = new ClaudeProvider();

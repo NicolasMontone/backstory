@@ -1,11 +1,9 @@
 import { Database } from "bun:sqlite";
 import { openDb, lastIngestedAt, replacePrompts, upsertSessions } from "./db.ts";
 import { correlate } from "./correlate.ts";
-import { codexProvider } from "./providers/codex.ts";
-import { claudeProvider } from "./providers/claude.ts";
-import type { Provider } from "./providers/types.ts";
+import { sessionProviders } from "./providers/index.ts";
 import { fetchPr, ghReady, type PrInfo } from "./github.ts";
-import { installHook, recordHook } from "./hook.ts";
+import { hookProviders, recordHook, type HookInstallResult, type HookProvider, type HookStatus } from "./hooks/index.ts";
 import {
   activeSession,
   commitInfo,
@@ -22,8 +20,6 @@ import {
   type SessionWithPrompts,
   type Stats,
 } from "./query.ts";
-
-export const PROVIDERS: Provider[] = [codexProvider, claudeProvider];
 
 export interface IngestSummary {
   providers: Array<{ provider: string; available: boolean; sessions: number; prompts: number }>;
@@ -89,7 +85,7 @@ export class Backstory {
     const providers: IngestSummary["providers"] = [];
     let totalS = 0;
     let totalP = 0;
-    for (const provider of PROVIDERS) {
+    for (const provider of sessionProviders()) {
       if (!provider.isAvailable()) {
         providers.push({ provider: provider.name, available: false, sessions: 0, prompts: 0 });
         continue;
@@ -147,12 +143,26 @@ export class Backstory {
     return stats(this.db);
   }
 
-  /** Install the git post-commit hook in `dir`. */
-  installHook(dir: string) {
-    return installHook(dir);
+  /** The registered hook providers (git post-commit, and any future ones). */
+  hookProviders(): HookProvider[] {
+    return hookProviders();
   }
 
-  /** Record an exact commit→session link (called by the hook). */
+  /** Status of every hook provider in `dir`. */
+  async hookStatus(dir: string): Promise<HookStatus[]> {
+    return Promise.all(hookProviders().map((h) => h.status(dir)));
+  }
+
+  /** Install every supported hook provider in `dir`. */
+  async installHooks(dir: string): Promise<HookInstallResult[]> {
+    const results: HookInstallResult[] = [];
+    for (const h of hookProviders()) {
+      if (await h.isSupported(dir)) results.push(await h.install(dir));
+    }
+    return results;
+  }
+
+  /** Record an exact commit→session link (called by the git hook). */
   recordHook(dir: string) {
     return recordHook(this.db, dir, (root, withinMs) => activeSession(this.db, root, withinMs));
   }
@@ -165,5 +175,8 @@ export type {
   SessionListItem,
   SessionWithPrompts,
   Stats,
+  HookProvider,
+  HookStatus,
+  HookInstallResult,
 };
 export type { SessionRecord, PromptRecord, Provider } from "./providers/types.ts";

@@ -2,8 +2,9 @@ import type { Database } from "bun:sqlite";
 import { $ } from "bun";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { linkCommitSession, upsertCommit } from "./db.ts";
-import { repoRoot, resolveSha, showCommit } from "./git.ts";
+import { linkCommitSession, upsertCommit } from "../db.ts";
+import { repoRoot, resolveSha, showCommit } from "../git.ts";
+import type { HookInstallResult, HookProvider, HookStatus } from "./types.ts";
 
 const MARKER = "# >>> backstory post-commit >>>";
 const END = "# <<< backstory post-commit <<<";
@@ -29,9 +30,7 @@ export async function installHook(dir: string): Promise<{ path: string; created:
   const path = join(hd, "post-commit");
 
   // The hook shells out to `bs`; fall back to this exact runner if bs isn't on PATH.
-  const runner = process.execPath.endsWith("bun")
-    ? `bun ${join(import.meta.dir, "index.ts")}`
-    : `bs`;
+  const runner = process.execPath.endsWith("bun") ? `bun ${join(import.meta.dir, "..", "index.ts")}` : `bs`;
   const block = [
     MARKER,
     `if command -v bs >/dev/null 2>&1; then bs hook record >/dev/null 2>&1 || true;`,
@@ -44,7 +43,6 @@ export async function installHook(dir: string): Promise<{ path: string; created:
   if (existsSync(path)) {
     content = readFileSync(path, "utf8");
     if (content.includes(MARKER)) {
-      // Replace the existing backstory block in place.
       content = content.replace(new RegExp(`${MARKER}[\\s\\S]*?${END}`), block);
     } else {
       content = content.replace(/\s*$/, "\n") + "\n" + block + "\n";
@@ -59,9 +57,8 @@ export async function installHook(dir: string): Promise<{ path: string; created:
 }
 
 /**
- * Called by the git post-commit hook. Finds the Codex/agent session that is
- * active in this repo right now and records an exact commit→session link.
- * `findActiveSession` is injected so we can ingest fresh data first.
+ * Called by the git post-commit hook. Finds the agent session active in this
+ * repo right now and records an exact commit→session link.
  */
 export async function recordHook(
   db: Database,
@@ -85,3 +82,28 @@ export async function recordHook(
   linkCommitSession(db, sha, session.id, "hook");
   return { sha, sessionId: session.id };
 }
+
+/** Git `post-commit` hook — agent-agnostic exact linking for any commit. */
+export class GitPostCommitHookProvider implements HookProvider {
+  readonly name = "git-post-commit";
+  readonly description = "git post-commit hook that stamps the active session onto each new commit";
+
+  async isSupported(dir: string): Promise<boolean> {
+    return (await repoRoot(dir)) !== null;
+  }
+
+  async status(dir: string): Promise<HookStatus> {
+    const hd = await hooksDir(dir);
+    if (!hd) return { provider: this.name, supported: false, installed: false, detail: "not a git repository" };
+    const path = join(hd, "post-commit");
+    const installed = existsSync(path) && readFileSync(path, "utf8").includes(MARKER);
+    return { provider: this.name, supported: true, installed, detail: path };
+  }
+
+  async install(dir: string): Promise<HookInstallResult> {
+    const { path, created } = await installHook(dir);
+    return { provider: this.name, installed: true, detail: `${created ? "installed" : "updated"} ${path}` };
+  }
+}
+
+export const gitPostCommitHook = new GitPostCommitHookProvider();
