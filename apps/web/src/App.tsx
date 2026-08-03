@@ -14,16 +14,99 @@ function Badge({ kind, children }: { kind: string; children: React.ReactNode }) 
 }
 
 function Markdown({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/);
+  const blocks: React.ReactNode[] = [];
+  let plainLines: string[] = [];
+
+  const flushPlain = () => {
+    if (plainLines.length === 0) return;
+    const start = blocks.length;
+    blocks.push(
+      <span className="markdown-lines" key={`lines-${start}`}>
+        {plainLines.map((line, i) => (
+          <span key={i}>
+            {i > 0 && <br />}
+            {renderInlineMarkdown(line)}
+          </span>
+        ))}
+      </span>
+    );
+    plainLines = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    if (isBoxTableBorder(lines[i])) {
+      flushPlain();
+      const tableLines: string[] = [];
+      while (i < lines.length && (lines[i].includes("│") || isBoxTableBorder(lines[i]))) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      i--;
+      const tableRows = tableLines
+        .filter((line) => line.includes("│") && !line.includes("─"))
+        .map(splitBoxTableRow)
+        .filter((row) => row.length > 0);
+      if (tableRows.length > 0) {
+        blocks.push(<Table headers={tableRows[0]} rows={tableRows.slice(1)} key={`table-${blocks.length}`} />);
+      }
+    } else if (i + 1 < lines.length && isTableSeparator(lines[i + 1]) && lines[i].includes("|")) {
+      flushPlain();
+      const headers = splitTableRow(lines[i]);
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim() !== "") {
+        rows.push(splitTableRow(lines[i]));
+        i++;
+      }
+      i--;
+      blocks.push(<Table headers={headers} rows={rows} key={`table-${blocks.length}`} />);
+    } else {
+      plainLines.push(lines[i]);
+    }
+  }
+  flushPlain();
+
   return (
     <div className="markdown">
-      {text.split("\n").map((line, i) => (
-        <span key={i}>
-          {i > 0 && <br />}
-          {renderInlineMarkdown(line)}
-        </span>
-      ))}
+      {blocks}
     </div>
   );
+}
+
+function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  return (
+    <table className="markdown-table">
+      <thead>
+        <tr>{headers.map((cell, j) => <th key={j}>{renderInlineMarkdown(cell)}</th>)}</tr>
+      </thead>
+      <tbody>
+        {rows.map((row, j) => (
+          <tr key={j}>
+            {headers.map((_, k) => <td key={k}>{renderInlineMarkdown(row[k] ?? "")}</td>)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function isBoxTableBorder(line: string): boolean {
+  return /[┌├└┐┤┘┬┴┼]/.test(line) && line.includes("─");
+}
+
+function isTableSeparator(line: string): boolean {
+  const cells = splitTableRow(line);
+  return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function splitTableRow(line: string): string[] {
+  const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return trimmed.split("|").map((cell) => cell.trim());
+}
+
+function splitBoxTableRow(line: string): string[] {
+  return line.split("│").slice(1, -1).map((cell) => cell.trim());
 }
 
 function renderInlineMarkdown(text: string): React.ReactNode[] {
@@ -92,11 +175,9 @@ function SessionRow({
       <div className="title">{s.title || s.id}</div>
       <div className="meta">
         <Badge kind={s.provider}>{s.provider}</Badge>
-        <span className="repo">{s.repo ?? "no-repo"}</span>
-        {s.branch && <span className="sep">·</span>}
-        {s.branch && <span className="branch">{s.branch}</span>}
-        <span className="sep">·</span>
-        <span className="count">{s.promptCount}p</span>
+        <span className="field repo"><span className="field-label">repo</span><span className="field-value">{s.repo ?? "no-repo"}</span></span>
+        {s.branch && <span className="field branch"><span className="field-label">branch</span><span className="field-value">{s.branch}</span></span>}
+        <span className="field count"><span className="field-label">prompts</span><span className="field-value">{s.promptCount}</span></span>
       </div>
     </div>
   );

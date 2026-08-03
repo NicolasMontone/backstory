@@ -211,23 +211,43 @@ body {
 .row .meta > span {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.row .meta .repo,
-.row .meta .branch {
-  flex: 0 1 auto;
+.row .meta .field {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  overflow: hidden;
+}
+.row .meta .field-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.row .meta .field-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row .meta .repo {
+  flex: 0 1 105px;
 }
 .row .meta .badge {
   flex: 0 0 auto;
 }
 .row .meta .branch {
-  min-width: 2ch;
+  flex: 1 1 auto;
 }
-.row .meta .sep,
 .row .meta .count {
   flex: 0 0 auto;
-  overflow: visible;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-strong);
+  color: var(--accent);
+}
+.row .meta .count .field-label {
+  color: var(--accent);
 }
 
 .badge {
@@ -313,6 +333,32 @@ body {
   line-height: 1.55;
   font-size: 13.5px;
   overflow-wrap: anywhere;
+}
+.markdown-lines {
+  display: inline;
+}
+.markdown-table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+.markdown-table th,
+.markdown-table td {
+  padding: 7px 9px;
+  border: 1px solid var(--border-strong);
+  text-align: left;
+  vertical-align: top;
+}
+.markdown-table th {
+  background: var(--panel-2);
+  color: var(--fg);
+  font-weight: 600;
+}
+.markdown-table td {
+  color: var(--muted);
 }
 .markdown a {
   color: var(--accent);
