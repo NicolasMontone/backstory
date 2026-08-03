@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+# local backstory index (also lives in ~/.backstory by default)
+*.db
+*.db-wal
+*.db-shm

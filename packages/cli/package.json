@@ -1,0 +1,21 @@
+{
+  "name": "@backstory/cli",
+  "version": "0.1.0",
+  "description": "backstory CLI (bs) — link AI-agent prompts to the commits & PRs they produced.",
+  "type": "module",
+  "bin": {
+    "bs": "./src/index.ts"
+  },
+  "files": ["src"],
+  "scripts": {
+    "bs": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}

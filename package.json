@@ -1,0 +1,11 @@
+{
+  "name": "backstory",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Link the prompts from your AI coding agents (Codex, Claude Code) to the commits and PRs they produced.",
+  "packageManager": "pnpm@9.0.6",
+  "scripts": {
+    "bs": "pnpm --filter @backstory/cli run bs",
+    "typecheck": "pnpm -r run typecheck"
+  }
+}
