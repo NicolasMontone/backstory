@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type LinkedCommit, type PrReport, type SearchHit, type SessionListItem, type SessionWithPrompts, type Stats } from "./api.ts";
+import { api, type LinkedCommit, type SearchHit, type SessionListItem, type SessionWithPrompts, type Stats } from "./api.ts";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "?";
@@ -158,9 +158,6 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionWithPrompts | null>(null);
   const [commits, setCommits] = useState<LinkedCommit[]>([]);
-  const [prNumber, setPrNumber] = useState("");
-  const [pr, setPr] = useState<PrReport | null>(null);
-  const [prError, setPrError] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -187,27 +184,17 @@ export function App() {
     }
     setDetail(null);
     setCommits([]);
-    Promise.all([api.session(selectedId), api.sessionCommits(selectedId)])
-      .then(([session, linkedCommits]) => {
+    api.session(selectedId)
+      .then((session) => {
         setDetail(session);
-        setCommits(linkedCommits);
+        return api.sessionCommits(selectedId).catch(() => [] as LinkedCommit[]);
       })
+      .then(setCommits)
       .catch(() => setDetail(null));
   }, [selectedId]);
 
   const searching = hits !== null;
   const grouped = useMemo(() => sessions, [sessions]);
-
-  function loadPr(e: React.FormEvent) {
-    e.preventDefault();
-    const number = Number(prNumber);
-    if (!Number.isInteger(number) || number < 1) return;
-    setPrError(null);
-    api.pr(number).then(setPr).catch((error: Error) => {
-      setPr(null);
-      setPrError(error.message);
-    });
-  }
 
   return (
     <div className="app">
@@ -221,31 +208,7 @@ export function App() {
               onChange={(e) => setQuery(e.target.value)}
               spellCheck={false}
             />
-            <form className="pr-search" onSubmit={loadPr}>
-              <input
-                placeholder="load PR #…"
-                value={prNumber}
-                onChange={(e) => setPrNumber(e.target.value)}
-                inputMode="numeric"
-                spellCheck={false}
-              />
-              <button type="submit">open</button>
-            </form>
           </div>
-          {pr && (
-            <div className="pr-result">
-              <a href={pr.pr.url} target="_blank" rel="noreferrer" className="pr-title">
-                PR #{pr.pr.number} · {pr.pr.title}
-              </a>
-              <div className="pr-meta">{pr.pr.repo} · {pr.sessions.length} linked sessions</div>
-              {pr.sessions.map((s) => (
-                <button className="pr-session" key={s.id} onClick={() => setSelectedId(s.id)}>
-                  {s.title || s.id}
-                </button>
-              ))}
-            </div>
-          )}
-          {prError && <div className="pr-error">{prError}</div>}
           <div className="list">
             {searching
               ? hits!.map((h) => (

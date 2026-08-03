@@ -126,45 +126,6 @@ body {
 .searchbar input:focus {
   border-color: var(--accent);
 }
-.pr-search {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-.pr-search input { flex: 1; }
-.pr-search button {
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--panel-2);
-  color: var(--fg);
-  font-family: var(--mono);
-  font-size: 11px;
-  padding: 0 9px;
-  cursor: pointer;
-}
-.pr-result {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--accent) 5%, var(--bg));
-}
-.pr-title { color: var(--accent); font-weight: 500; text-decoration: none; overflow-wrap: anywhere; }
-.pr-meta { color: var(--faint); font: 11px var(--mono); margin: 5px 0 8px; }
-.pr-session {
-  display: block;
-  border: 0;
-  background: none;
-  color: var(--fg);
-  cursor: pointer;
-  font: 12px var(--sans);
-  padding: 3px 0;
-  text-align: left;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pr-session:hover { color: var(--accent); }
-.pr-error { padding: 10px 14px; color: var(--corr); font: 11px var(--mono); overflow-wrap: anywhere; }
 
 .list {
   overflow-y: auto;
