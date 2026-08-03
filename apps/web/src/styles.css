@@ -257,8 +257,17 @@ body {
   padding: 1px 4px;
 }
 
-.commits {
-  margin-top: 28px;
+.prompt-commits {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.prompt-commit-label {
+  color: var(--faint);
+  font: 10px var(--mono);
+  letter-spacing: 0.05em;
+  margin-bottom: 7px;
+  text-transform: uppercase;
 }
 .commit {
   display: flex;

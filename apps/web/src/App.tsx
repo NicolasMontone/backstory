@@ -105,8 +105,8 @@ function SessionRow({
 function CommitList({ commits }: { commits: LinkedCommit[] }) {
   if (commits.length === 0) return null;
   return (
-    <section className="commits">
-      <div className="label">linked commits</div>
+    <div className="prompt-commits">
+      <div className="prompt-commit-label">commits from this prompt</div>
       {commits.map((commit) => (
         <a
           className="commit"
@@ -120,8 +120,22 @@ function CommitList({ commits }: { commits: LinkedCommit[] }) {
           <Badge kind={commit.source === "hook" ? "exact" : "corr"}>{commit.source === "hook" ? "exact" : "correlated"}</Badge>
         </a>
       ))}
-    </section>
+    </div>
   );
+}
+
+/** Attribute each commit to the latest prompt before it was authored. */
+function commitsForPrompt(prompts: SessionWithPrompts["prompts"], index: number, commits: LinkedCommit[]): LinkedCommit[] {
+  return commits.filter((commit) => {
+    const commitAt = commit.authoredAt ? Date.parse(commit.authoredAt) : Number.NaN;
+    if (!Number.isFinite(commitAt)) return index === prompts.length - 1;
+    let owner = 0;
+    for (let i = 0; i < prompts.length; i++) {
+      const promptAt = prompts[i].ts ? Date.parse(prompts[i].ts!) : Number.NaN;
+      if (Number.isFinite(promptAt) && promptAt <= commitAt) owner = i;
+    }
+    return owner === index;
+  });
 }
 
 function Detail({ session, commits }: { session: SessionWithPrompts | null; commits: LinkedCommit[] }) {
@@ -139,13 +153,13 @@ function Detail({ session, commits }: { session: SessionWithPrompts | null; comm
         <span>{fmtDate(session.startedAt)}</span>
       </div>
       <div className="label">{session.prompts.length} prompt{session.prompts.length === 1 ? "" : "s"}</div>
-      {session.prompts.map((p) => (
+      {session.prompts.map((p, index) => (
         <div className="prompt" key={p.seq}>
           <div className="num">#{p.seq}{p.ts ? ` · ${fmtDate(p.ts)}` : ""}</div>
           <Markdown text={p.text} />
+          <CommitList commits={commitsForPrompt(session.prompts, index, commits)} />
         </div>
       ))}
-      <CommitList commits={commits} />
     </div>
   );
 }
