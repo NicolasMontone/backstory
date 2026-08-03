@@ -77,7 +77,9 @@ export async function parseClaudeFile(path: string): Promise<ParsedClaudeSession
     }
 
     if (o.sessionId) sessionId = o.sessionId;
-    if (o.cwd) cwd = o.cwd;
+    // Claude tool events can descend into child repositories. Resume must use
+    // the session's original project directory, recorded by SessionStart.
+    if (o.cwd && !cwd) cwd = o.cwd;
     if (o.gitBranch) branch = o.gitBranch;
     if (o.aiTitle) title = o.aiTitle;
     const ts: string | null = o.timestamp ?? null;

@@ -59,4 +59,19 @@ describe("parseClaudeFile", () => {
     const parsed = await parseClaudeFile(file);
     expect(parsed!.prompts.map((p) => p.text)).toEqual(["build the thing"]);
   });
+
+  test("keeps the initial project cwd when later tool events descend into a repo", async () => {
+    const dir = tmp();
+    dirs.push(dir);
+    const file = join(dir, "cwd.jsonl");
+    write(
+      file,
+      jsonl(
+        { type: "system", sessionId: "s3", cwd: "/Users/me/projects", timestamp: "2026-07-01T10:00:00Z" },
+        { type: "user", sessionId: "s3", cwd: "/Users/me/projects/repo", timestamp: "2026-07-01T10:00:01Z", promptSource: "typed", message: { role: "user", content: "continue" } },
+      ),
+    );
+    const parsed = await parseClaudeFile(file);
+    expect(parsed!.session.cwd).toBe("/Users/me/projects");
+  });
 });

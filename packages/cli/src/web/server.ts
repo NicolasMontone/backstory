@@ -33,7 +33,13 @@ function openSessionTerminal(bs: Backstory, id: string): { provider: string; com
   const session = bs.session(id);
   if (!session) throw new Error("session not found");
   if (process.platform !== "darwin") throw new Error("Opening sessions is currently supported on macOS only");
-  const binaryName = session.provider === "codex" ? "codex" : "claude";
+  if (session.provider === "codex") {
+    const url = `codex://threads/${encodeURIComponent(session.id)}`;
+    const result = Bun.spawnSync(["open", url], { stdout: "ignore", stderr: "pipe" });
+    if (result.exitCode !== 0) throw new Error(`Codex Desktop could not open the thread (${result.exitCode})`);
+    return { provider: session.provider, command: `open ${url}` };
+  }
+  const binaryName = "claude";
   const binary = Bun.which(binaryName);
   if (!binary) throw new Error(`${binaryName} is not available on the Backstory server PATH`);
   const command = session.provider === "codex"
