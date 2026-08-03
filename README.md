@@ -25,6 +25,17 @@ Every read command takes `--json` for machine/LLM consumption:
 bs commit HEAD --json | jq '.sessions[].prompts[].text'
 ```
 
+### Web dashboard
+
+```bash
+bs web            # starts a local server (Bun) + opens the dashboard
+```
+
+A React/Vite UI (in `apps/web`, Geist-styled) for browsing sessions, prompts, and
+search. `bs web` serves the built UI and exposes the `Backstory` API under `/api/*`.
+Build it once with `pnpm --filter @backstory/web build`; for UI development run
+`pnpm --filter @backstory/web dev` (Vite proxies `/api` to `bs web`).
+
 ## How linking works (hybrid)
 
 A commit isn't stamped with the prompt that produced it, so `backstory` links the two
@@ -89,8 +100,8 @@ the network, via your local `gh`.
 
 pnpm monorepo:
 
-- `packages/cli` — the `bs` CLI (Bun + `bun:sqlite`).
-- `apps/` — reserved for future apps (e.g. a landing page / web viewer).
+- `packages/cli` — the `bs` CLI (Bun + `bun:sqlite`), and the type-safe `Backstory` API.
+- `apps/web` — the web dashboard (React + Vite), a consumer of the `Backstory` API.
 
 ### Extending
 

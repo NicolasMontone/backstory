@@ -60,6 +60,8 @@ const COMMON = {
   limit: { type: "string" },
   since: { type: "string" },
   author: { type: "string", multiple: true },
+  port: { type: "string" },
+  "no-open": { type: "boolean" },
 } satisfies ParseArgsConfig["options"];
 
 function parse(args: string[]) {
@@ -188,6 +190,17 @@ function cmdStats(args: string[]): void {
   });
 }
 
+async function cmdWeb(args: string[]): Promise<void> {
+  const { values } = parse(args);
+  const { startWebServer } = await import("./web/server.ts");
+  const { url } = startWebServer({
+    port: values.port ? Number(values.port) : undefined,
+    open: !values["no-open"],
+  });
+  console.log(`${green("●")} backstory web running at ${bold(url)}  ${dim("(Ctrl-C to stop)")}`);
+  // Bun.serve keeps the process alive.
+}
+
 async function cmdHook(args: string[]): Promise<void> {
   const sub = args[0];
   const { values } = parse(args.slice(1));
@@ -243,6 +256,7 @@ ${bold("usage:")} bs <command> [args]   ${dim("(add --json to any read command f
   ${cyan("session")} <id>                                     Full prompt list for one session
   ${cyan("search")} <text> [--limit N]                        Full-text search across prompts
   ${cyan("stats")}                                            Index totals, by provider & repo
+  ${cyan("web")} [--port N] [--no-open]                        Open the web dashboard
   ${cyan("hook install")} | ${cyan("hook status")}                    Install / check exact-linking hooks
 
   Run ${bold("bs ingest")} first (and after new agent work) to refresh the index.
@@ -260,6 +274,7 @@ async function main(): Promise<void> {
     case "session": return cmdSession(rest);
     case "search": return cmdSearch(rest);
     case "stats": return cmdStats(rest);
+    case "web": return cmdWeb(rest);
     case "hook": return cmdHook(rest);
     case undefined:
     case "help":
