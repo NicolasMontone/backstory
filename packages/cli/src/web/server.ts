@@ -33,10 +33,15 @@ function openSessionTerminal(bs: Backstory, id: string): { provider: string; com
   const session = bs.session(id);
   if (!session) throw new Error("session not found");
   if (process.platform !== "darwin") throw new Error("Opening sessions is currently supported on macOS only");
-  const executable = session.provider === "codex" ? "codex resume" : "claude --resume";
-  const command = `${executable} ${shellQuote(session.id)}`;
+  const binaryName = session.provider === "codex" ? "codex" : "claude";
+  const binary = Bun.which(binaryName);
+  if (!binary) throw new Error(`${binaryName} is not available on the Backstory server PATH`);
+  const command = session.provider === "codex"
+    ? `${shellQuote(binary)} resume ${shellQuote(session.id)}`
+    : `${shellQuote(binary)} --resume ${shellQuote(session.id)}`;
   const script = `tell application "Terminal" to do script "cd ${shellQuote(session.cwd)} && ${command}"`;
-  Bun.spawn(["osascript", "-e", script], { stdout: "ignore", stderr: "ignore" });
+  const result = Bun.spawnSync(["osascript", "-e", script], { stdout: "ignore", stderr: "pipe" });
+  if (result.exitCode !== 0) throw new Error(`macOS could not open Terminal (${result.exitCode})`);
   return { provider: session.provider, command };
 }
 

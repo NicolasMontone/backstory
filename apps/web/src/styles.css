@@ -341,6 +341,11 @@ body {
   color: var(--claude);
   font: 11px var(--mono);
 }
+.open-status {
+  margin: -2px 0 10px;
+  color: var(--exact);
+  font: 11px var(--mono);
+}
 .detail .subline {
   font-family: var(--mono);
   font-size: 12px;
