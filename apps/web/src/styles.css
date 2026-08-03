@@ -464,14 +464,16 @@ body {
 .observability {
   overflow-y: auto;
   min-height: 0;
-  padding: 34px 42px 50px;
+  width: 100%;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 34px clamp(24px, 3vw, 56px) 50px;
 }
 .observe-heading {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 20px;
-  max-width: 1100px;
 }
 .eyebrow,
 .panel-heading,
@@ -488,7 +490,6 @@ body {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 10px;
-  max-width: 1100px;
   margin: 28px 0 16px;
 }
 .observe-cards > div,
@@ -500,14 +501,14 @@ body {
 .observe-cards > div { padding: 13px 14px; }
 .observe-cards span { display: block; color: var(--faint); font: 10px var(--mono); text-transform: uppercase; }
 .observe-cards b { display: block; margin-top: 8px; font: 20px var(--mono); color: var(--fg); }
-.activity-panel { max-width: 1100px; margin-top: 16px; padding: 16px; }
+.activity-panel { margin-top: 16px; padding: 16px; }
 .panel-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .legend { display: flex; gap: 12px; letter-spacing: 0; text-transform: none; }
 .legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .legend-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .legend-dot.codex { background: var(--codex); }
 .legend-dot.claude { background: var(--claude); }
-.activity-chart-wrap { min-height: 285px; }
+.activity-chart-wrap { position: relative; min-height: 285px; }
 .activity-chart-svg { display: block; width: 100%; height: auto; min-height: 220px; }
 .chart-grid { stroke: var(--border); stroke-width: 1; }
 .chart-axis-label,
@@ -518,6 +519,41 @@ body {
 .activity-point { stroke: var(--panel); stroke-width: 2; }
 .activity-point.codex { fill: var(--codex); }
 .activity-point.claude { fill: var(--claude); }
+.activity-hit { fill: transparent; pointer-events: all; cursor: pointer; }
+.chart-node { cursor: pointer; }
+.chart-tooltip-foreign { opacity: 0; pointer-events: none; overflow: visible; transition: opacity 120ms ease; }
+.chart-node:hover .chart-tooltip-foreign { opacity: 1; }
+.chart-tooltip-svg {
+  width: 180px;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--panel-2);
+  box-shadow: 0 8px 24px #00000040;
+  font: 10px var(--mono);
+}
+.chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  width: 180px;
+  padding: 10px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--panel-2);
+  box-shadow: 0 8px 24px #00000040;
+  pointer-events: none;
+  font: 10px var(--mono);
+}
+.chart-tooltip-date { color: var(--fg); }
+.chart-tooltip-provider { display: flex; align-items: center; gap: 5px; margin-top: 6px; text-transform: uppercase; }
+.chart-tooltip-provider i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.chart-tooltip-provider.codex { color: var(--codex); }
+.chart-tooltip-provider.codex i { background: var(--codex); }
+.chart-tooltip-provider.claude { color: var(--claude); }
+.chart-tooltip-provider.claude i { background: var(--claude); }
+.chart-tooltip-stats { margin-top: 6px; color: var(--muted); line-height: 1.5; }
+.chart-tooltip-stats b { color: var(--fg); font-weight: 500; }
 .empty-chart { margin: auto; color: var(--faint); font: 12px var(--mono); }
 .faint { color: var(--faint); letter-spacing: 0; text-transform: none; }
 .activity-table-panel { padding-bottom: 8px; }

@@ -286,7 +286,25 @@ function ActivityChart({ points, providers }: { points: ActivityPoint[]; provide
         <svg className="activity-chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Prompt activity over time">
           {ticks.map((tick) => <g key={tick}><line className="chart-grid" x1={pad.left} x2={width - pad.right} y1={y(max * tick)} y2={y(max * tick)} /><text className="chart-axis-label" x={pad.left - 10} y={y(max * tick) + 4} textAnchor="end">{Math.round(max * tick)}</text></g>)}
           {providers.map((provider) => <path key={provider} className={`activity-line ${provider}`} d={path(provider)} />)}
-          {points.map((p, i) => providers.map((provider) => (p.byProvider[provider] ?? 0) > 0 && <circle key={`${p.day}-${provider}`} className={`activity-point ${provider}`} cx={x(i)} cy={y(p.byProvider[provider])} r="3"><title>{`${p.day} · ${provider}: ${p.byProvider[provider]} prompts · ${p.sessions} sessions · ${p.commits} commits`}</title></circle>))}
+          {points.map((p, i) => providers.map((provider) => {
+            const prompts = p.byProvider[provider] ?? 0;
+            if (prompts === 0) return null;
+            return <g key={`${p.day}-${provider}`}>
+              <g className="chart-node">
+                <circle className="activity-hit" cx={x(i)} cy={y(prompts)} r="10">
+                  <title>{`${p.day} · ${provider}: ${prompts} prompts · ${p.sessions} sessions · ${p.commits} commits`}</title>
+                </circle>
+                <foreignObject className="chart-tooltip-foreign" x={Math.min(x(i) + 10, width - 194)} y={Math.max(y(prompts) - 78, pad.top)} width="180" height="70">
+                  <div className={`chart-tooltip-svg ${provider}`}>
+                    <div className="chart-tooltip-date">{p.day}</div>
+                    <div className={`chart-tooltip-provider ${provider}`}><i />{provider}</div>
+                    <div className="chart-tooltip-stats"><b>{prompts}</b> prompts <b>{p.sessions}</b> sessions <b>{p.commits}</b> commits</div>
+                  </div>
+                </foreignObject>
+              </g>
+              <circle className={`activity-point ${provider}`} cx={x(i)} cy={y(prompts)} r="4" />
+            </g>;
+          }))}
           {dateTicks.map((index) => <text key={index} className="chart-date-label" x={x(index)} y={height - 10} textAnchor="middle">{points[index]?.day.slice(5)}</text>)}
         </svg>
       )}
