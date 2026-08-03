@@ -9,8 +9,13 @@ import type { ParsedSession, PromptRecord, SessionRecord } from "./types.ts";
 const claudeHome = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 const projectsDir = () => join(claudeHome(), "projects");
 
-/** Prompt sources that represent something the human actually entered. */
-const HUMAN_SOURCES = new Set(["typed", "queued"]);
+/**
+ * Prompt sources that represent something the human actually entered:
+ * `typed`/`queued` in the interactive TUI, and `sdk` when Claude Code runs
+ * through the SDK/harness (still the user's own prompts). Excludes `system` and
+ * null (tool results, injected context).
+ */
+const HUMAN_SOURCES = new Set(["typed", "queued", "sdk"]);
 
 /** Extract prompt text from a Claude `user` message's content (string or list). */
 function extractText(content: unknown): string {

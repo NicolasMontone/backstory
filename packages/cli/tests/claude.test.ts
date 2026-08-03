@@ -43,4 +43,20 @@ describe("parseClaudeFile", () => {
     expect(prompts.map((p) => p.text)).toEqual(["first prompt", "why is this red?", "and fix the padding"]);
     expect(prompts.map((p) => p.seq)).toEqual([0, 1, 2]);
   });
+
+  test("includes sdk prompts (Claude Code via the SDK/harness)", async () => {
+    const dir = tmp();
+    dirs.push(dir);
+    const file = join(dir, "sdk.jsonl");
+    write(
+      file,
+      jsonl(
+        { type: "user", sessionId: "s2", cwd: "/w", gitBranch: "main", timestamp: "2026-07-01T10:00:00Z", promptSource: "sdk", message: { role: "user", content: "build the thing" } },
+        // system-source prompt is still excluded
+        { type: "user", sessionId: "s2", timestamp: "2026-07-01T10:00:01Z", promptSource: "system", message: { role: "user", content: "injected system note" } },
+      ),
+    );
+    const parsed = await parseClaudeFile(file);
+    expect(parsed!.prompts.map((p) => p.text)).toEqual(["build the thing"]);
+  });
 });
