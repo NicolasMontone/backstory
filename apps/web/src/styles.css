@@ -180,6 +180,7 @@ body {
   padding: 11px 14px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
+  min-width: 0;
 }
 .row:hover {
   background: var(--panel);
@@ -198,11 +199,18 @@ body {
 .row .meta {
   margin-top: 4px;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
+  line-height: 1.35;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--faint);
+}
+.row .meta > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .badge {
