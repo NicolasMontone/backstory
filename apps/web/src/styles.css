@@ -206,8 +206,10 @@ body {
   background: var(--panel);
 }
 .row.active {
-  background: var(--panel-2);
-  box-shadow: inset 2px 0 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+}
+.row.active .title {
+  color: var(--accent);
 }
 .row .title {
   font-weight: 500;
