@@ -25,7 +25,22 @@ const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 
 /** Route /api/* to the typed Backstory facade. */
-async function handleApi(bs: Backstory, url: URL): Promise<Response> {
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function openSessionTerminal(bs: Backstory, id: string): { provider: string; command: string } {
+  const session = bs.session(id);
+  if (!session) throw new Error("session not found");
+  if (process.platform !== "darwin") throw new Error("Opening sessions is currently supported on macOS only");
+  const executable = session.provider === "codex" ? "codex resume" : "claude --resume";
+  const command = `${executable} ${shellQuote(session.id)}`;
+  const script = `tell application "Terminal" to do script "cd ${shellQuote(session.cwd)} && ${command}"`;
+  Bun.spawn(["osascript", "-e", script], { stdout: "ignore", stderr: "ignore" });
+  return { provider: session.provider, command };
+}
+
+async function handleApi(bs: Backstory, url: URL, req: Request): Promise<Response> {
   const p = url.pathname.replace(/^\/api\//, "");
   const seg = p.split("/").map(decodeURIComponent);
   const q = url.searchParams;
@@ -36,6 +51,7 @@ async function handleApi(bs: Backstory, url: URL): Promise<Response> {
     if (p === "sessions")
       return json(bs.sessions({ limit: q.get("limit") ? Number(q.get("limit")) : 200, repo: q.get("repo") ?? undefined }));
     if (seg[0] === "session" && seg[1]) {
+      if (seg[2] === "open" && req.method === "POST") return json(openSessionTerminal(bs, seg[1]));
       if (seg[2] === "commits") return json(bs.sessionCommits(seg[1]));
       const s = bs.session(seg[1]);
       return s ? json(s) : json({ error: "not found" }, 404);
@@ -83,7 +99,7 @@ export function startWebServer(opts: { port?: number; open?: boolean } = {}): { 
     port,
     async fetch(req) {
       const url = new URL(req.url);
-      if (url.pathname.startsWith("/api/")) return handleApi(bs, url);
+      if (url.pathname.startsWith("/api/")) return handleApi(bs, url, req);
       if (!dist) {
         return new Response(
           "<h1>backstory web</h1><p>UI not built yet. Run:</p><pre>pnpm --filter @backstory/web build</pre><p>The API is live at <code>/api/stats</code>.</p>",
