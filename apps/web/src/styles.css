@@ -119,13 +119,16 @@ body {
 /* body layout */
 .main {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: max-content 1fr;
   min-height: 0;
 }
 .sidebar {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  width: fit-content;
+  min-width: 320px;
+  max-width: 640px;
   min-height: 0;
 }
 .searchbar {
