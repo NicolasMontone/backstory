@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backstory CLI"
+  short_description: "Use Backstory to trace prompts to code"
+  default_prompt: "Use $backstory-cli to inspect prompts, sessions, commits, and PR relationships in this repository."

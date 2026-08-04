@@ -1,120 +1,172 @@
 # backstory
 
-Link the prompts you gave your AI coding agents to the commits and PRs they produced.
+Trace the prompts given to your coding agents to the sessions, commits, branches,
+and pull requests they produced.
 
-`backstory` reads the on-disk session logs your agents already keep, indexes every
-prompt you typed, and joins them to git — so you can ask *"what did I ask to get this
-commit?"* or *"which prompts are behind this PR?"*.
+Backstory reads the local logs already written by Codex and Claude Code, stores a
+searchable SQLite index, and joins that history with Git. It is designed for questions
+like:
 
-It ingests **Codex** (`~/.codex/sessions`) and **Claude Code**
-(`~/.claude/projects`) sessions today. The provider layer is small to extend.
+- What prompts led to this commit?
+- Which sessions contributed to this branch or PR?
+- What was I asking my agents about last week?
+- Which prompts were linked exactly, and which were inferred?
 
-```
-bs commit HEAD          # prompts behind a commit
-bs pr 27901             # prompts behind a GitHub PR
-bs branch my-feature    # prompts on a branch
-bs session <id>         # every prompt in one session
-bs search "raindrop"    # full-text search across all your prompts
-bs sessions             # recent sessions
-bs stats                # totals by provider & repo
-```
+Everything is local by default. The only network-backed command is `bs pr`, which
+uses your authenticated local `gh` CLI to read GitHub data.
 
-Every read command takes `--json` for machine/LLM consumption:
+## Quick start
 
-```bash
-bs commit HEAD --json | jq '.sessions[].prompts[].text'
-```
+Requirements:
 
-### Web dashboard
+- [Bun](https://bun.sh) 1.1+
+- Git
+- `gh` authenticated with GitHub, only if you use `bs pr`
 
-```bash
-bs web            # starts a local server (Bun) + opens the dashboard
-```
-
-A React/Vite UI (in `apps/web`, Geist-styled) for browsing sessions, prompts, and
-search. `bs web` serves the built UI and exposes the `Backstory` API under `/api/*`.
-Build it once with `pnpm --filter @backstory/web build`; for UI development run
-`pnpm --filter @backstory/web dev` (Vite proxies `/api` to `bs web`).
-
-## How linking works (hybrid)
-
-A commit isn't stamped with the prompt that produced it, so `backstory` links the two
-in two complementary ways:
-
-- **`~ correlated`** — inferred from every existing session by matching **repo +
-  branch + time window**, restricted to commits **you** authored (your git identity).
-  Works retrospectively across your whole history, zero setup.
-- **`● exact`** — a git `post-commit` hook stamps the *active* session onto each new
-  commit as you make it. Precise, opt-in per repo, going forward only.
-
-Install the hook in a repo to get exact links there:
-
-```bash
-bs hook install
-```
-
-## Setup
-
-Requires [Bun](https://bun.sh) (the CLI runs on it) and `git`. `bs pr` also needs the
-[`gh`](https://cli.github.com) CLI, authenticated.
+From a checkout of this repository:
 
 ```bash
 pnpm install
-# run without linking:
 pnpm bs ingest
-# or link `bs` onto your PATH:
-cd packages/cli && bun link
+pnpm bs web
 ```
 
-Run `bs ingest` first, and again after new agent work, to refresh the index. Use
-`bs ingest --full` to rebuild from scratch, and `--author you@email` to override the
-git identities that count as "yours" during correlation.
+`bs web` starts the local dashboard at `http://localhost:4319`. To start the API
+without opening a browser:
+
+```bash
+pnpm bs web --no-open
+```
+
+The CLI can also be linked onto your PATH:
+
+```bash
+cd packages/cli
+bun link
+```
+
+Then use `bs ...` instead of `pnpm bs ...`.
+
+## CLI commands
+
+Run `bs ingest` once before querying and again after new agent work. Use
+`--full` when you need to rebuild the index from all available provider logs.
+
+```bash
+bs ingest                         # incremental parse + Git correlation
+bs ingest --full                  # rebuild the local index
+bs ingest --since 2026-08-01      # ingest from a timestamp
+bs ingest --author you@example.com # override the Git identities considered yours
+
+bs commit HEAD                    # prompts behind the current commit
+bs commit abc123 --full           # full prompts for a specific commit
+bs branch my-feature              # prompts found on a branch
+bs branch my-feature --repo org/app
+bs pr 27901                       # prompts behind a GitHub PR
+bs sessions --limit 50             # recent sessions
+bs session <session-id>            # all prompts and linked commits in one session
+bs search "raindrop"               # full-text search across prompts
+bs stats                           # index totals and breakdowns
+```
+
+Every read command supports `--json`, which is the preferred interface for scripts
+and agents:
+
+```bash
+bs commit HEAD --json
+bs search "deployment" --json | jq '.[].text'
+bs session <session-id> --json
+```
+
+Human-readable reports show link provenance:
+
+- `● exact` means a Git post-commit hook recorded the active session directly.
+- `~ correlated` means Backstory inferred the relationship from repository, branch,
+  authorship, and time window.
+
+## Exact commit links
+
+Correlation works retrospectively, but exact links require installing Backstory's
+Git post-commit hook in each repository where you want precise attribution:
+
+```bash
+cd /path/to/repository
+bs hook status
+bs hook install
+```
+
+The hook is agent-agnostic and preserves an existing user hook. It records the active
+session after a commit; it does not rewrite commit history. To inspect or manually
+record a link:
+
+```bash
+bs hook status --json
+bs hook record
+```
+
+## Web dashboard
+
+The dashboard has two views:
+
+- **Prompts**: search and browse sessions, with provider, repository, branch, prompt
+  count, sorting, and prompt-level linked commits.
+- **Observability**: activity over time for prompts, sessions, and commits, separated
+  by provider.
+
+For frontend development:
+
+```bash
+pnpm --filter @backstory/web build
+pnpm --filter @backstory/web dev
+```
+
+The Vite app proxies `/api/*` to a running `bs web` server.
+
+## How it works
+
+Built-in providers parse:
+
+- Codex sessions from `~/.codex/sessions`
+- Claude Code sessions from `~/.claude/projects`
+
+The provider layer normalizes sessions and prompts into SQLite. Git correlation then
+matches commits authored by you to sessions using repository, branch, and time-window
+signals. Exact hook links take precedence over inferred links.
+
+The database lives at `~/.backstory/backstory.db`. Set `BACKSTORY_DB` to use another
+location. Agent logs and the database remain on disk; Backstory does not upload them.
 
 ## Programmatic API
 
-The core is a type-safe class, exported from the package so other apps (e.g. a web
-viewer) can reuse it without shelling out:
+The CLI package exports the typed `Backstory` facade for applications such as the web
+dashboard:
 
 ```ts
 import { Backstory } from "@backstory/cli";
 
-using bs = Backstory.open();               // opens the SQLite index
-await bs.ingest();                          // parse + correlate
-const { sessions } = bs.commitReport(sha);  // fully typed report
+using bs = Backstory.open();
+await bs.ingest();
+const report = bs.commitReport("HEAD");
 ```
 
-## Tests
+Useful methods include `sessions`, `session`, `sessionCommits`, `commitReport`,
+`branchReport`, `prReport`, `search`, `stats`, and `activityTimeline`.
+
+## Development
 
 ```bash
-pnpm --filter @backstory/cli test        # bun test
-pnpm --filter @backstory/cli typecheck
+pnpm install
+pnpm typecheck
+pnpm --filter @backstory/cli test
+pnpm --filter @backstory/web build
 ```
 
-## Data
+Repository layout:
 
-The index is a local SQLite DB at `~/.backstory/backstory.db` (override with
-`BACKSTORY_DB`). Nothing leaves your machine; `bs pr` is the only command that talks to
-the network, via your local `gh`.
+- `packages/cli` — Bun CLI, SQLite index, providers, Git correlation, hooks, and API
+- `apps/web` — React/Vite dashboard
+- `.agents/skills/backstory-cli` — instructions for coding agents using Backstory
 
-## Layout
-
-pnpm monorepo:
-
-- `packages/cli` — the `bs` CLI (Bun + `bun:sqlite`), and the type-safe `Backstory` API.
-- `apps/web` — the web dashboard (React + Vite), a consumer of the `Backstory` API.
-
-### Extending
-
-**Add an AI agent** — most agents store one JSONL session per file, so extend
-`JsonlSessionProvider` (`providers/base.ts`): declare `rootDir()` and implement
-`parseFile()`, then register it in `providers/index.ts`. The base class handles
-directory walking, `isAvailable()`, and incremental `--since` skipping. Codex and
-Claude Code are the two built-ins.
-
-**Add an exact-linking mechanism** — implement `HookProvider` (`hooks/types.ts`) and
-register it in `hooks/index.ts`. The built-in `git-post-commit` hook is agent-agnostic;
-a future one could use an agent's own hooks (e.g. Claude Code hooks, Codex `notify`) to
-record the producing session with no time-window guessing.
-
-Both layers use a small registry, and the typed `Backstory` API exposes
-`sessionProviders()`, `hookProviders()`, `installHooks()`, and `hookStatus()`.
+To add an agent provider, implement a provider in `packages/cli/src/providers` and
+register it in `providers/index.ts`. To add an exact-link mechanism, implement a
+`HookProvider` and register it in `hooks/index.ts`.
