@@ -12,8 +12,9 @@ like:
 - What was I asking my agents about last week?
 - Which prompts were linked exactly, and which were inferred?
 
-Everything is local by default. The only network-backed command is `bs pr`, which
-uses your authenticated local `gh` CLI to read GitHub data.
+Everything is local by default. The only network-backed commands are `bs pr` and
+`bs link`, which use your authenticated local `gh` CLI to read GitHub data; `bs link`
+additionally publishes a read-only snapshot to your own share service.
 
 ## Quick start
 
@@ -63,6 +64,7 @@ bs commit abc123 --full           # full prompts for a specific commit
 bs branch my-feature              # prompts found on a branch
 bs branch my-feature --repo org/app
 bs pr 27901                       # prompts behind a GitHub PR
+bs link 27901                     # publish a PR's prompts to an unguessable share link
 bs sessions --limit 50             # recent sessions
 bs session <session-id>            # all prompts and linked commits in one session
 bs search "raindrop"               # full-text search across prompts
@@ -122,6 +124,37 @@ pnpm --filter @backstory/web dev
 
 The Vite app proxies `/api/*` to a running `bs web` server.
 
+## Share links
+
+`bs link <pr>` publishes the prompts behind a PR to an **unguessable, shareable link**
+you can send to anyone — no account required on either end.
+
+```bash
+bs link 27901
+# PR #27901 Add export button
+#   2 session(s) · 7 prompt(s) published
+#
+#   ● https://your-deployment.vercel.app/s/6f1c…-…-…
+```
+
+Under the hood it runs the same PR correlation as `bs pr` (via `gh`), then POSTs a
+snapshot — PR metadata plus each session's prompts — to a small share service. Local
+paths (`cwd`) are stripped; only the prompts are published. The link id is a v4 UUID,
+so it is unguessable, but the page is public: don't share prompts you wouldn't paste
+in a public gist.
+
+The service is a minimal Next.js app in [`apps/share`](apps/share) that stores each
+snapshot as a single JSON object in **Vercel Blob** (no database) and renders it at
+`/s/<id>`. Point the CLI at your deployment:
+
+```bash
+export BACKSTORY_SHARE_URL=https://your-deployment.vercel.app
+bs link 27901
+# or per-invocation: bs link 27901 --endpoint https://your-deployment.vercel.app
+```
+
+See [`apps/share/README.md`](apps/share/README.md) for deploying it to Vercel.
+
 ## How it works
 
 Built-in providers parse:
@@ -165,6 +198,7 @@ Repository layout:
 
 - `packages/cli` — Bun CLI, SQLite index, providers, Git correlation, hooks, and API
 - `apps/web` — React/Vite dashboard
+- `apps/share` — Next.js share service (`bs link`), deployed to Vercel with Blob storage
 - `.agents/skills/backstory-cli` — instructions for coding agents using Backstory
 
 To add an agent provider, implement a provider in `packages/cli/src/providers` and

@@ -3,6 +3,7 @@ import { parseArgs, type ParseArgsConfig } from "node:util";
 import { Backstory } from "./api.ts";
 import { resolveSha } from "./git.ts";
 import type { SessionWithPrompts } from "./query.ts";
+import { buildSharePayload, createShareLink, promptCount } from "./share.ts";
 
 // ---- tiny ANSI helpers -------------------------------------------------------
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -75,6 +76,7 @@ const COMMON = {
   author: { type: "string", multiple: true },
   port: { type: "string" },
   "no-open": { type: "boolean" },
+  endpoint: { type: "string" },
 } satisfies ParseArgsConfig["options"];
 
 function parse(args: string[]) {
@@ -143,6 +145,42 @@ async function cmdPr(args: string[]): Promise<void> {
     console.log(bold(`PR #${report.pr.number} ${report.pr.title}`));
     console.log(dim(`  ${report.pr.repo} · ${report.pr.headRefName} → ${report.pr.baseRefName} · ${report.pr.url}`));
     renderSessions(report.sessions, { full: Boolean(values.full) });
+  });
+}
+
+async function cmdLink(args: string[]): Promise<void> {
+  const { values, positionals } = parse(args);
+  const num = Number(positionals[0]);
+  if (!num) return fail("usage: bs link <pr-number> [--repo owner/name] [--endpoint URL] [--json]");
+  using bs = Backstory.open();
+  let report;
+  try {
+    report = await bs.prReport(num, { dir: process.cwd(), repo: values.repo as string | undefined });
+  } catch (e) {
+    return fail((e as Error).message);
+  }
+  if (!report) return fail(`could not fetch PR #${num}`);
+
+  const payload = buildSharePayload(report);
+  const prompts = promptCount(payload);
+  if (prompts === 0) {
+    console.error(
+      dim("warning: no prompts are linked to this PR yet — run `bs ingest`, or install the hook for exact links."),
+    );
+  }
+
+  let link;
+  try {
+    link = await createShareLink(payload, { endpoint: values.endpoint as string | undefined });
+  } catch (e) {
+    return fail((e as Error).message);
+  }
+
+  emit(Boolean(values.json), { id: link.id, url: link.url, sessions: payload.sessions.length, prompts }, () => {
+    console.log(bold(`PR #${payload.pr.number} ${payload.pr.title}`));
+    console.log(dim(`  ${payload.sessions.length} session(s) · ${prompts} prompt(s) published`));
+    console.log(`\n  ${green("●")} ${bold(link.url)}`);
+    console.log(dim("  Anyone with this link can read the prompts. It is unguessable, but public."));
   });
 }
 
@@ -269,6 +307,7 @@ ${bold("usage:")} bs <command> [args]   ${dim("(add --json to any read command f
   ${cyan("commit")} [rev] [--full]                            Prompts behind a commit (default HEAD)
   ${cyan("branch")} <name> [--repo] [--full]                  Prompts on a branch
   ${cyan("pr")} <number> [--repo] [--full]                    Prompts behind a GitHub PR (needs gh)
+  ${cyan("link")} <number> [--repo] [--endpoint URL]          Publish a PR's prompts to an unguessable share link
   ${cyan("sessions")} [--limit N] [--repo]                    List recent sessions
   ${cyan("session")} <id>                                     Full prompt list for one session
   ${cyan("search")} <text> [--limit N]                        Full-text search across prompts
@@ -287,6 +326,7 @@ async function main(): Promise<void> {
     case "commit": return cmdCommit(rest);
     case "branch": return cmdBranch(rest);
     case "pr": return cmdPr(rest);
+    case "link": return cmdLink(rest);
     case "sessions": return cmdSessions(rest);
     case "session": return cmdSession(rest);
     case "search": return cmdSearch(rest);
