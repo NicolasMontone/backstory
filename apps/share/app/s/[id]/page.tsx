@@ -55,8 +55,8 @@ function SessionCard({ session }: { session: ShareSession }) {
           {[session.branch, started].filter(Boolean).join(" · ")}
         </span>
       </div>
-      {session.prompts.map((p) => (
-        <div className="prompt" key={p.seq}>
+      {session.prompts.map((p, i) => (
+        <div className="prompt" key={`${session.id || session.startedAt}-${p.seq}-${i}`}>
           <p className="prompt-text">{p.text}</p>
           {p.ts && <div className="prompt-ts">{fmtDate(p.ts)}</div>}
         </div>

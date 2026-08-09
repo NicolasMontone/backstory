@@ -33,11 +33,19 @@ export interface ShareLink {
   url: string;
 }
 
-const DEFAULT_ENDPOINT = "http://localhost:3000";
-
-/** Where the share service lives. `--endpoint` wins, then env, then localhost. */
+/**
+ * Where the share service lives. `--endpoint` wins, then `BACKSTORY_SHARE_URL`.
+ * There is no silent default: a published CLI must not quietly POST prompts to
+ * `localhost`. When neither is set we throw with an actionable message (for local
+ * development, set `BACKSTORY_SHARE_URL=http://localhost:3000`).
+ */
 export function shareEndpoint(explicit?: string): string {
-  const base = explicit || process.env.BACKSTORY_SHARE_URL || DEFAULT_ENDPOINT;
+  const base = explicit || process.env.BACKSTORY_SHARE_URL;
+  if (!base) {
+    throw new Error(
+      "no share endpoint configured — set BACKSTORY_SHARE_URL (e.g. https://your-app.vercel.app) or pass --endpoint",
+    );
+  }
   return base.replace(/\/+$/, ""); // no trailing slash
 }
 

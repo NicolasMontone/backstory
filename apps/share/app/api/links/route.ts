@@ -13,11 +13,18 @@ function json(data: unknown, status: number): Response {
   });
 }
 
-/** Public origin, honoring Vercel's proxy headers, so returned links are correct. */
+/**
+ * Public origin for the returned link. Prefer a configured canonical origin so
+ * the host can't be spoofed via `x-forwarded-host`: `BACKSTORY_PUBLIC_URL` wins,
+ * then Vercel's own `VERCEL_PROJECT_PRODUCTION_URL`, and only as a last resort do
+ * we fall back to the request URL's origin (dev / preview).
+ */
 function originOf(req: Request): string {
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-  const proto = req.headers.get("x-forwarded-proto") ?? "https";
-  return host ? `${proto}://${host}` : new URL(req.url).origin;
+  const configured = process.env.BACKSTORY_PUBLIC_URL;
+  if (configured) return configured.replace(/\/+$/, "");
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercel) return `https://${vercel}`;
+  return new URL(req.url).origin;
 }
 
 export async function POST(req: Request): Promise<Response> {

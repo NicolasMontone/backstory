@@ -64,12 +64,13 @@ describe("shareEndpoint", () => {
     expect(shareEndpoint("https://share.example.com/")).toBe("https://share.example.com");
   });
 
-  test("falls back to BACKSTORY_SHARE_URL then localhost", () => {
+  test("falls back to BACKSTORY_SHARE_URL, then throws when unconfigured", () => {
     const prev = process.env.BACKSTORY_SHARE_URL;
     process.env.BACKSTORY_SHARE_URL = "https://env.example.com";
     expect(shareEndpoint()).toBe("https://env.example.com");
     delete process.env.BACKSTORY_SHARE_URL;
-    expect(shareEndpoint()).toBe("http://localhost:3000");
+    // No silent localhost default: a published CLI must not quietly POST prompts.
+    expect(() => shareEndpoint()).toThrow(/no share endpoint configured/);
     if (prev !== undefined) process.env.BACKSTORY_SHARE_URL = prev;
   });
 });
