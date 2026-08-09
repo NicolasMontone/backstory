@@ -2,9 +2,6 @@ import { randomUUID } from "node:crypto";
 import { validateSharePayload } from "@/lib/payload";
 import { saveLink } from "@/lib/store";
 
-// node:crypto + the Blob SDK both run happily on the Node.js runtime.
-export const runtime = "nodejs";
-
 // The unauthenticated create endpoint. Kept deliberately small: validate, cap,
 // mint an unguessable id, store, return the link. No auth or rate limiting yet.
 const MAX_BYTES = 2_000_000; // 2 MB of JSON is plenty for a PR's prompts.
