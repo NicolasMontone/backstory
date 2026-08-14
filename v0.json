@@ -1,0 +1,9 @@
+{
+  "$schema": "https://v0.dev/schemas/v0.schema.json",
+  "projects": {
+    ".": {
+      "devCommand": "cd apps/web && pnpm dev --host",
+      "port": 5319
+    }
+  }
+}
